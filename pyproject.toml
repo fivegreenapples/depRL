@@ -60,7 +60,7 @@ ensure_newline_before_comments = true
 
 
 [tool.ruff]
-ignore = ["C901", "F403", "F405"]
+lint.ignore = ["C901", "F403", "F405"]
 line-length = 79
 target-version= "py310"
 
