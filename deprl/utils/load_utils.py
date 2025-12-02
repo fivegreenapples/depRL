@@ -103,6 +103,65 @@ def load_checkpoint(checkpoint_path, checkpoint="last"):
     return config, checkpoint_path, time_dict
 
 
+def load_checkpoint_paths(checkpoint_path, checkpoints="all"):
+    """
+    Checkpoint loading for main() function.
+    """
+    if not os.path.isdir(checkpoint_path):
+        logger.log(f"Checkpoint path is not valid: {checkpoint_path}")
+        return []
+
+    logger.log(f"Loading checkpoints from {checkpoint_path}")
+
+    # List all the checkpoints.
+    checkpoint_ids = []
+    for file in os.listdir(checkpoint_path):
+        if file[:5] == "step_":
+            checkpoint_id = file.split(".")[0]
+            checkpoint_ids.append(int(checkpoint_id[5:]))
+    checkpoint_ids.sort()
+
+    if checkpoint_ids:
+        # Use all checkpoints.
+        if checkpoints == "all":
+            checkpoint_paths = [
+                os.path.join(checkpoint_path, f"step_{checkpoint_id}")
+                for checkpoint_id in checkpoint_ids
+            ]
+
+        # Assume a comma-separated list of checkpoint ids.
+        else:
+            checkpoints = [
+                int(chkpt.strip())
+                for chkpt in checkpoints.split(",")
+                if chkpt.strip() != ""
+            ]
+            checkpoint_paths = [
+                os.path.join(checkpoint_path, f"step_{checkpoint_id}")
+                for checkpoint_id in checkpoints
+                if checkpoint_id in checkpoint_ids
+            ]
+            for checkpoint_id in checkpoints:
+                if checkpoint_id not in checkpoint_ids:
+                    logger.error(
+                        f"Checkpoint {checkpoint_id} "
+                        f"not found in {checkpoint_path}"
+                    )
+
+    else:
+        logger.error(f"No checkpoint found in {checkpoint_path}")
+        return []
+
+    return checkpoint_paths
+
+
+def load_config(path):
+    arguments_path = os.path.join(path, "config.yaml")
+    with open(arguments_path, "r") as config_file:
+        config = yaml.load(config_file, Loader=yaml.FullLoader)
+    return config
+
+
 # All kinds of pretrained baselines
 def load_baseline(environment):
     identifier = (
