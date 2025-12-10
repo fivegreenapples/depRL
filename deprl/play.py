@@ -2,6 +2,7 @@
 
 import argparse
 import os
+import time
 
 import numpy as np
 
@@ -98,6 +99,7 @@ def play_gym(agent, environment, noisy, num_episodes, no_render):
         observations, reward, done, info = environment.step(actions)
         muscle_states = environment.muscle_states
         if not no_render:
+            time.sleep(0.01)
             mujoco_render(environment)
 
         steps += 1

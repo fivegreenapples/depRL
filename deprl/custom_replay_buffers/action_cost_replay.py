@@ -15,13 +15,13 @@ class AdaptiveEnergyBuffer(Buffer):
         # num_acts needs to match your model!
         self.num_acts = kwargs.pop("num_acts")
         # smoothing parameter
-        self.alpha = kwargs.pop("alpha", 0.8)
+        self.alpha = kwargs.pop("alpha", 0.8)  # beta
         # performance threshold that needs to be achieved
-        self.threshold = kwargs.pop("threshold", 1000)
+        self.threshold = kwargs.pop("threshold", 1000)  # theta
         # initial learning rate for the energy cost
-        self.lr = kwargs.pop("lr", 9e-4)
+        self.lr = kwargs.pop("lr", 9e-4)  # delta_alpha
         # how much the learning rate decreased after a collapse
-        self.lr_decimation = kwargs.pop("lr_decimation", 0.9)
+        self.lr_decimation = kwargs.pop("lr_decimation", 0.9)  # gamma
         # type of energy cost function
         self.cost_function = kwargs.pop("cost_function", 3)
 

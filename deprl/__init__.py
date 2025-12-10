@@ -1,6 +1,7 @@
 from . import (
     custom_agents,
     custom_mpo_torch,
+    custom_myosuite,
     custom_replay_buffers,
     custom_trainer,
 )
@@ -19,6 +20,7 @@ from .vendor.tonic import (
 __all__ = [
     custom_replay_buffers,
     custom_mpo_torch,
+    custom_myosuite,
     custom_agents,
     custom_trainer,
     apply_wrapper,

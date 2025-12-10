@@ -75,7 +75,7 @@ def play_gym(
             observations, reward, done, info = environment.step(actions)
             muscle_states = environment.muscle_states
             if not no_render:
-                time.sleep(0.005)
+                time.sleep(0.01)
                 mujoco_render(environment)
 
             steps += 1
