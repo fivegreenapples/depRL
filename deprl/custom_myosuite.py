@@ -8,11 +8,11 @@ from myosuite.envs.myo.myobase.walk_v0 import WalkEnvV0
 
 class WalkEnvCustomRewardV0(WalkEnvV0):
     DEFAULT_RWD_KEYS_AND_WEIGHTS = {
-        "gaussian_vel_coeff": 10,
-        "grf_coeff": -0.07281,
-        "smooth_exc_coeff": -0.097,
-        "number_muscles_coeff": -1.57929,
-        "joint_limit_coeff": -0.1307,
+        "gaussian_vel": 10,
+        "grf": -0.07281,
+        "smooth_exc": -0.097,
+        "number_muscles": -1.57929,
+        "joint_limit": -0.1307,
     }
 
     def step(self, *args, **kwargs):
@@ -134,10 +134,7 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
             )
         )
         rwd_dict["dense"] = np.sum(
-            [
-                wt * rwd_dict[key[: -len("_coeff")]]
-                for key, wt in self.rwd_keys_wt.items()
-            ],
+            [wt * rwd_dict[key] for key, wt in self.rwd_keys_wt.items()],
             axis=0,
         )
         return rwd_dict
