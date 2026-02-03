@@ -25,10 +25,7 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
         # TODO: this keeps the velocity reward at zero until model is moving quite near target. fine for low targets. not for high targets.
         _, y_vel = self._get_com_velocity()
 
-        if y_vel < self.target_y_vel:
-            return np.exp(-np.square(y_vel - self.target_y_vel))
-
-        return 1.0
+        return np.exp(-np.square(y_vel - self.target_y_vel))
 
     def _grf(self):
         # TODO: calculate and store weight early on. In __init?
