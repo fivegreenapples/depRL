@@ -26,7 +26,7 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
 
         return np.exp(
             # narrow gaussian to make transverse velocity undesirable
-            -5 * np.square(x_vel),
+            -np.square(5 * x_vel),
         ) + np.exp(
             -np.square(y_vel - self.target_y_vel),
         )
