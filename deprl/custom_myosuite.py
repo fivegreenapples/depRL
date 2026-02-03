@@ -21,14 +21,14 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
 
     def _gaussian_plateau_vel(self):
         # TODO: account for x_velocity properly. cp mujoco which allows drift. Reward should prefer model to stay on straight line not slowly drift sidwways.
-        # TODO: this keeps the velocity reward at zero until model is moving quite near target. fine for low targets. not for high targets.
         x_vel, y_vel = self._get_com_velocity()
 
         return np.exp(
             # narrow gaussian to make transverse velocity undesirable
             -np.square(5 * x_vel),
         ) + np.exp(
-            -np.square(y_vel - self.target_y_vel),
+            # scale gaussian according to target velocity so reward goes from approx 0 at zero velocity to 1 at target
+            -np.square((2 / self.target_y_vel) * (y_vel - self.target_y_vel)),
         )
 
     def _grf(self):
