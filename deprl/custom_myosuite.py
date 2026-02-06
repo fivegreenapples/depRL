@@ -34,13 +34,15 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
         if y_vel <= self.target_y_vel:
             # For forward velocities less than target, scale gaussian according to target
             # so reward goes from approx 0 at zero velocity to 1 at target
-            y_reward = -np.square(
-                (2 / self.target_y_vel) * (y_vel - self.target_y_vel)
+            y_reward = np.exp(
+                -np.square(
+                    (2 / self.target_y_vel) * (y_vel - self.target_y_vel)
+                )
             )
         else:
             # For forward velocities above target apply a steepish curve to
             # disincentivise going over.
-            y_reward = -np.square(3 * (y_vel - self.target_y_vel))
+            y_reward = np.exp(-np.square(3 * (y_vel - self.target_y_vel)))
 
         return x_reward + y_reward
 
