@@ -8,7 +8,7 @@ from myosuite.envs.myo.myobase.walk_v0 import WalkEnvV0
 
 class WalkEnvCustomRewardV0(WalkEnvV0):
     DEFAULT_RWD_KEYS_AND_WEIGHTS = {
-        "gaussian_vel": 10,
+        "gaussian_vel": 5,
         "grf": -0.07281,
         "smooth_exc": -0.097,
         "number_muscles": -1.57929,
@@ -20,15 +20,31 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
         return super().step(*args, **kwargs)
 
     def _gaussian_plateau_vel(self):
-        # TODO: account for x_velocity. Scone implementation only uses forward velocity.
-        # TODO: account for x_velocity properly. cp mujoco which allows drift. Reward should prefer model to stay on straight line not slowly drift sidwways.
-        # TODO: this keeps the velocity reward at zero until model is moving quite near target. fine for low targets. not for high targets.
-        _, y_vel = self._get_com_velocity()
+        # TODO: account for sideways drift. Reward should prefer model to stay on straight line not slowly drift sideways. Might be better as a separate position reward not vel reward.
+        x_vel, y_vel = self._get_com_velocity()
 
-        if y_vel < self.target_y_vel:
-            return np.exp(-np.square(y_vel - self.target_y_vel))
+        # Velocity reward broken into reward from sideways movement (always targetting 0 m/s)
+        # and reward from forward movement (according to externally set preference)
+        # For forward we use an assymetric curve around the target so the reward shape
+        # encourages gradually getting up to target speed, but penalises going over.
 
-        return 1.0
+        # For sideways movement, use a narrow gaussian to make transverse velocity undesirable
+        x_reward = np.exp(-np.square(5 * x_vel))
+
+        if y_vel <= self.target_y_vel:
+            # For forward velocities less than target, scale gaussian according to target
+            # so reward goes from approx 0 at zero velocity to 1 at target
+            y_reward = np.exp(
+                -np.square(
+                    (2 / self.target_y_vel) * (y_vel - self.target_y_vel)
+                )
+            )
+        else:
+            # For forward velocities above target apply a steepish curve to
+            # disincentivise going over.
+            y_reward = np.exp(-np.square(3 * (y_vel - self.target_y_vel)))
+
+        return x_reward + y_reward
 
     def _grf(self):
         # TODO: calculate and store weight early on. In __init?
