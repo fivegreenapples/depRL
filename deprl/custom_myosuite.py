@@ -13,11 +13,26 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
         "smooth_exc": -0.097,
         "number_muscles": -1.57929,
         "joint_limit": -0.1307,
+        "done": -100,
     }
 
     def step(self, *args, **kwargs):
         self._prev_ctrl = self.sim.data.ctrl.copy()
         return super().step(*args, **kwargs)
+
+    ##
+    ## Base class definition of "done"
+    ## Here for easy visibility and tweakign if required.
+    ##
+    # def _get_done(self):
+    #     height = self._get_height()
+    #     if height < self.min_height:
+    #         return 1
+    #     if self._get_rot_condition():
+    #         return 1
+    #     if self._get_knee_condition():
+    #         return 1
+    #     return 0
 
     def _gaussian_plateau_vel(self):
         # TODO: account for sideways drift. Reward should prefer model to stay on straight line not slowly drift sideways. Might be better as a separate position reward not vel reward.
