@@ -1,9 +1,11 @@
 import collections
+import math
 import os
 
 import numpy as np
 from myosuite.envs.myo.myobase import register_env_with_variants
 from myosuite.envs.myo.myobase.walk_v0 import WalkEnvV0
+from myosuite.utils.quat_math import quat2mat
 
 
 class WalkEnvCustomRewardV0(WalkEnvV0):
@@ -13,6 +15,9 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
         "smooth_exc": -0.097,
         "number_muscles": -1.57929,
         "joint_limit": -0.1307,
+        "forward_lean": 5,
+        "sideways_lean": 2.5,
+        "forward_direction": 2.5,
         "done": -100,
     }
 
@@ -20,19 +25,72 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
         self._prev_ctrl = self.sim.data.ctrl.copy()
         return super().step(*args, **kwargs)
 
-    ##
-    ## Base class definition of "done"
-    ## Here for easy visibility and tweakign if required.
-    ##
-    # def _get_done(self):
-    #     height = self._get_height()
-    #     if height < self.min_height:
-    #         return 1
-    #     if self._get_rot_condition():
-    #         return 1
-    #     if self._get_knee_condition():
-    #         return 1
-    #     return 0
+    def _orientation(self):
+        # Here we establish the forward lean, sideways lean, and deviation from
+        # forward direction, returning them separately to allow for varying weights.
+        #
+        # Note for reasons I don't quite understand the y and x axes seem to work in
+        # the opposite directions to what I would expect. That is, if the model moves
+        # forward along positive y-direction (confirmed by velocity), and z-axis is
+        # positive up (my assumption) then the calculation of forward lean should
+        # result in positive y. But I get a negative result. Similarly for deviation
+        # from forward direction, I get a negative result (which seems to imply the
+        # model's local coordinates have y-axis positive out its back. Kinda weird and
+        # no doubt something I'm misunderstanding. Either way the use of negative unit
+        # vectors below is to get positive results in directions I want them.
+
+        # Get the rotation matrix from the quaternion
+        quat = self.sim.data.qpos[3:7].copy()
+        rot_mat = quat2mat(quat)
+
+        # Establish forward and sideways components of z-vector for torso lean amount.
+        # See above for why negative unit vector
+        # x is sideways, positive fall to right, 0 means no lean
+        x_component_of_unit_z = -rot_mat[0][2]  # aka (rot_mat @ [0, 0, -1])[0]
+        # y is forward/back, positive fall to front, 0 means no lean
+        y_component_of_unit_z = -rot_mat[1][2]  # aka (rot_mat @ [0, 0, -1])[1]
+
+        # The amount the body is facing in the direction of travel
+        # local x coord of model faces forward, but model is made to move along the y-axis
+        # of environment. Kind of bonkers but seems to be true.
+        # Positive faces forward. Fully forward would be 1.
+        # Using negative unit vector per above comment.
+        y_component_of_unit_x = -rot_mat[1][0]  # aka (rot_mat @ [-1, 0, 0])[1]
+
+        # for walking we want basically upright, but for running a small forward lean
+        # is expected (5-7 degrees). So that we don't prefer upright, we'll allow a
+        # forward lean of 0 - 10 degrees without penalty.
+        # TODO: find reference for forward lean for running
+        forward_lean_angle = (180 / math.pi) * math.asin(y_component_of_unit_z)
+        if forward_lean_angle <= 0:
+            # leaning backwards, punish steeply
+            forward_lean_reward = (20 + forward_lean_angle) / 20
+        elif forward_lean_angle <= 10:
+            # allowed lean amount
+            forward_lean_reward = 1
+        else:
+            # leaning forwards, punish as increased lean
+            forward_lean_reward = (40 - forward_lean_angle) / 30
+        forward_lean_reward = max(0, min(1, forward_lean_reward))
+
+        # sideways lean is treated symmetrically
+        sideays_lean_angle = (180 / math.pi) * math.asin(x_component_of_unit_z)
+        sideways_lean_reward = (20 - abs(sideays_lean_angle)) / 20
+        sideways_lean_reward = max(0, min(1, sideways_lean_reward))
+
+        # Some forward deviation may be acceptable owing to hip swing but straight ahead
+        # is still preferred on average. We'll just raise the deviation value to a high
+        # power so going straight ahead scores 1 and drops off steeply either side.
+        # TODO: look up hip swing
+        forward_direction_reward = y_component_of_unit_x**8
+        if forward_direction_reward < 0.1:
+            forward_direction_reward = 0
+
+        return (
+            forward_lean_reward,
+            sideways_lean_reward,
+            forward_direction_reward,
+        )
 
     def _gaussian_plateau_vel(self):
         # TODO: account for sideways drift. Reward should prefer model to stay on straight line not slowly drift sideways. Might be better as a separate position reward not vel reward.
@@ -40,7 +98,7 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
 
         # Velocity reward broken into reward from sideways movement (always targetting 0 m/s)
         # and reward from forward movement (according to externally set preference)
-        # For forward we use an assymetric curve around the target so the reward shape
+        # For forward we use an asymetric curve around the target so the reward shape
         # encourages gradually getting up to target speed, but penalises going over.
 
         # For sideways movement, use a narrow gaussian to make transverse velocity undesirable
@@ -148,6 +206,7 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
 
     def get_reward_dict(self, obs_dict):
         vel_reward = self._get_vel_reward()
+        forward_lean, sideways_lean, forward_direction = self._orientation()
 
         rwd_dict = collections.OrderedDict(
             (
@@ -158,10 +217,18 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
                 ("smooth_exc", self._exc_smooth_cost()),
                 ("number_muscles", self._number_muscle_cost()),
                 ("joint_limit", self._joint_limit_torques()),
+                ("forward_lean", forward_lean),
+                ("sideways_lean", sideways_lean),
+                ("forward_direction", forward_direction),
                 # Must keys
                 ("sparse", vel_reward),
                 ("solved", vel_reward >= 1.0),
-                ("done", self._get_done()),
+                (
+                    "done",
+                    forward_lean == 0
+                    or sideways_lean == 0
+                    or forward_direction == 0,
+                ),
             )
         )
         rwd_dict["dense"] = np.sum(
