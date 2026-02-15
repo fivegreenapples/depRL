@@ -17,7 +17,7 @@ class AdaptiveEnergyBuffer(Buffer):
         # smoothing parameter
         self.alpha = kwargs.pop("alpha", 0.8)  # beta
         # performance threshold that needs to be achieved
-        self.threshold = kwargs.pop("threshold", 1000)  # theta
+        self.threshold = kwargs.pop("threshold", 10000)  # theta
         # initial learning rate for the energy cost
         self.lr = kwargs.pop("lr", 9e-4)  # delta_alpha
         # how much the learning rate decreased after a collapse

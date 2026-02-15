@@ -10,11 +10,12 @@ from myosuite.utils.quat_math import quat2mat
 
 class WalkEnvCustomRewardV0(WalkEnvV0):
     DEFAULT_RWD_KEYS_AND_WEIGHTS = {
-        "gaussian_vel": 5,
+        "gaussian_vel_x": 5,
+        "gaussian_vel_y": 5,
         "grf": -0.07281,
-        "smooth_exc": -0.097,
-        "number_muscles": -1.57929,
-        "joint_limit": -0.1307,
+        "smooth_exc": -9.7,
+        "number_muscles": -3,
+        "joint_limit": -1,  # -0.1307,
         "forward_lean": 5,
         "sideways_lean": 2.5,
         "forward_direction": 2.5,
@@ -92,7 +93,7 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
             forward_direction_reward,
         )
 
-    def _gaussian_plateau_vel(self):
+    def _gaussian_vel(self):
         # TODO: account for sideways drift. Reward should prefer model to stay on straight line not slowly drift sideways. Might be better as a separate position reward not vel reward.
         x_vel, y_vel = self._get_com_velocity()
 
@@ -117,7 +118,7 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
             # disincentivise going over.
             y_reward = np.exp(-np.square(3 * (y_vel - self.target_y_vel)))
 
-        return x_reward + y_reward
+        return x_reward, y_reward
 
     def _grf(self):
         # TODO: calculate and store weight early on. In __init?
@@ -149,9 +150,8 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
         delta_excs = self.sim.data.ctrl - self._prev_ctrl
         return np.mean(np.square(delta_excs))
 
-    def _number_muscle_cost(self):
-        # TODO: convert the magic 0.15 number to a parameter. May want to tweak it for running?
-        return self._get_proportion_active_muscles(0.15)
+    def _number_muscle_cost(self, threshold):
+        return self._get_proportion_active_muscles(threshold)
 
     def _get_proportion_active_muscles(self, threshold):
         """
@@ -208,14 +208,23 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
         vel_reward = self._get_vel_reward()
         forward_lean, sideways_lean, forward_direction = self._orientation()
 
+        vel_x_score, vel_y_score = self._gaussian_vel()
+
+        # adjust threshold used for proportion of muscles above a certain activation
+        # threshold. asumption is faster target velocities require more active muscles.
+        # Normalise by walking speed and multiply magic number (from paper) by it.
+        target_velocity_normed_by_walking_speed = self.target_y_vel / 1.2
+        muscle_threshold = 0.15 * target_velocity_normed_by_walking_speed
+
         rwd_dict = collections.OrderedDict(
             (
                 # Optional Keys
                 # TODO: name these better
-                ("gaussian_vel", self._gaussian_plateau_vel()),
+                ("gaussian_vel_x", vel_x_score),
+                ("gaussian_vel_y", vel_y_score),
                 ("grf", self._grf()),
                 ("smooth_exc", self._exc_smooth_cost()),
-                ("number_muscles", self._number_muscle_cost()),
+                ("number_muscles", self._number_muscle_cost(muscle_threshold)),
                 ("joint_limit", self._joint_limit_torques()),
                 ("forward_lean", forward_lean),
                 ("sideways_lean", sideways_lean),
