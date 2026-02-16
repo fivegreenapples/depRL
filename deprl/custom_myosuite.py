@@ -10,15 +10,15 @@ from myosuite.utils.quat_math import quat2mat
 
 class WalkEnvCustomRewardV0(WalkEnvV0):
     DEFAULT_RWD_KEYS_AND_WEIGHTS = {
-        "gaussian_vel_x": 5,
+        "gaussian_vel_x": 3,
         "gaussian_vel_y": 5,
         "grf": -0.07281,
         "smooth_exc": -9.7,
         "number_muscles": -3,
         "joint_limit": -1,  # -0.1307,
-        "forward_lean": 5,
-        "sideways_lean": 2.5,
-        "forward_direction": 2.5,
+        "forward_lean": 2,
+        "sideways_lean": 1,
+        "forward_direction": 1,
         "done": -100,
     }
 
@@ -216,6 +216,12 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
         target_velocity_normed_by_walking_speed = self.target_y_vel / 1.2
         muscle_threshold = 0.15 * target_velocity_normed_by_walking_speed
 
+        # Flag to indicate if walker has fallen vertically. Use to end the simulation.
+        # Avoids learning collapse when walker just kneels down.
+        too_low = self._get_height() < self.min_height
+        # TODO add condition about overally moved distance. e.g. not moved expected
+        # amount in certain time. Basically recognising a velocity collapse.
+
         rwd_dict = collections.OrderedDict(
             (
                 # Optional Keys
@@ -234,7 +240,8 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
                 ("solved", vel_reward >= 1.0),
                 (
                     "done",
-                    forward_lean == 0
+                    too_low
+                    or forward_lean == 0
                     or sideways_lean == 0
                     or forward_direction == 0,
                 ),
