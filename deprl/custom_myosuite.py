@@ -83,9 +83,21 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
         # is still preferred on average. We'll just raise the deviation value to a high
         # power so going straight ahead scores 1 and drops off steeply either side.
         # TODO: look up hip swing
+        # Above did not work quite correctly, leaving comment for reminder of history.
+        # The issue is that humans tend to keep their torso pointing forward while the
+        # hip swings as we walk. But in our simulation the torso and hips are locked
+        # together so we must allow the torso to swing because the hips do so. The
+        # resulting movement is of course affected by the weight applied to this reward
+        # term. In a previous run the weight favored hips with zero swing and led to an
+        # interesting gait of the legs.
+        # So new strategy is to allow a 15 degree swing either way without punishment.
+        # cosine(15deg) == 0.966
+        # Shift reward up so =/-15 degrees is above 1
+        forward_direction_reward = y_component_of_unit_x + (1 - 0.966)
+        # Apply high power to punish strongly either side of 15 degrees.
         forward_direction_reward = y_component_of_unit_x**8
-        if forward_direction_reward < 0.1:
-            forward_direction_reward = 0
+        # Clip 0 - 1
+        forward_direction_reward = max(0, min(1, forward_direction_reward))
 
         return (
             forward_lean_reward,
