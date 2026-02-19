@@ -265,6 +265,43 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
         )
         return rwd_dict
 
+    # This is a copy from the base class WalkEnvV0 to make it easier to insert the target
+    # velocity observations before the act array. Need act to stay at the end to satisfy
+    # expectations of the custom replay buffer AdaptiveEnergyBuffer.
+    def get_obs_dict(self, sim):
+        obs_dict = {}
+        obs_dict["t"] = np.array([sim.data.time])
+        obs_dict["time"] = np.array([sim.data.time])
+        obs_dict["qpos_without_xy"] = sim.data.qpos[2:].copy()
+        obs_dict["qvel"] = sim.data.qvel[:].copy() * self.dt
+        obs_dict["com_vel"] = np.array([self._get_com_velocity().copy()])
+        obs_dict["torso_angle"] = np.array([self._get_torso_angle().copy()])
+        obs_dict["feet_heights"] = self._get_feet_heights().copy()
+        obs_dict["height"] = np.array([self._get_height()]).copy()
+        obs_dict["feet_rel_positions"] = (
+            self._get_feet_relative_position().copy()
+        )
+        obs_dict["phase_var"] = np.array(
+            [(self.steps / self.hip_period) % 1]
+        ).copy()
+        obs_dict["muscle_length"] = self.muscle_lengths()
+        obs_dict["muscle_velocity"] = self.muscle_velocities()
+        obs_dict["muscle_force"] = self.muscle_forces()
+
+        # Insert target velocity observations here
+        _, y_vel = self._get_com_velocity()
+        obs_dict["target_vel"] = np.array(
+            [
+                self.target_y_vel,
+                self.target_y_vel - y_vel,
+            ]
+        )
+
+        if sim.model.na > 0:
+            obs_dict["act"] = sim.data.act[:].copy()
+
+        return obs_dict
+
 
 register_env_with_variants(
     id="myoLegWalk-v0-customReward",
@@ -284,5 +321,6 @@ register_env_with_variants(
         "target_y_vel": 1.2,  # desired y velocity in m/s
         "target_rot": None,  # if None then the initial root pos will be taken, otherwise provide quat
         "weighted_reward_keys": WalkEnvCustomRewardV0.DEFAULT_RWD_KEYS_AND_WEIGHTS,
+        "obs_keys": WalkEnvV0.DEFAULT_OBS_KEYS + ["target_vel"],
     },
 )
