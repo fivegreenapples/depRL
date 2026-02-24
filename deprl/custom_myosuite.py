@@ -24,6 +24,38 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
 
     def step(self, *args, **kwargs):
         self._prev_ctrl = self.sim.data.ctrl.copy()
+        # Add a curriculum here - temporary code - would be better as a config param.
+        # the first few match a manual curriculum where slowwalk was run twice by mistake :facepalm:
+        target_kmh = 0
+        if self.steps <= 2e8:
+            target_kmh = 3  # slowwalk
+        elif self.steps <= 2.7e8:
+            target_kmh = 4.32  # walk
+        elif self.steps <= 3.2e8:
+            target_kmh = 5.32  # fastwalk
+        elif self.steps <= 3.5e8:
+            target_kmh = 3  # revert to slowwalk
+        elif self.steps <= 3.75e8:
+            target_kmh = 4.32  # revert to walk
+        elif self.steps <= 4e8:
+            target_kmh = 5.32  # revert to fastwalk
+        elif self.steps <= 4.5e8:
+            target_kmh = 8  # jog
+        elif self.steps <= 5e8:
+            target_kmh = 10  # run
+        elif self.steps <= 5.2e8:
+            target_kmh = 3  # re-revert to slowwalk
+        elif self.steps <= 5.4e8:
+            target_kmh = 4.32  # re-revert to  walk
+        elif self.steps <= 5.6e8:
+            target_kmh = 5.32  # re-revert to  fastwalk
+        elif self.steps <= 5.8e8:
+            target_kmh = 8  # revert to  jog
+        elif self.steps <= 6e8:
+            target_kmh = 10  # revert to  run
+
+        self.target_y_vel = target_kmh * 1000 / 3600
+
         return super().step(*args, **kwargs)
 
     def _orientation(self):
