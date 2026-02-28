@@ -1,6 +1,7 @@
 import collections
 import math
 import os
+import time
 
 import numpy as np
 from myosuite.envs.myo.myobase import register_env_with_variants
@@ -22,39 +23,45 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
         "done": -100,
     }
 
+    def _setup(
+        self,
+        curriculum=None,
+        **kwargs,
+    ):
+        self.curriculum = curriculum
+        super()._setup(**kwargs)
+
     def step(self, *args, **kwargs):
         self._prev_ctrl = self.sim.data.ctrl.copy()
-        # Add a curriculum here - temporary code - would be better as a config param.
-        # the first few match a manual curriculum where slowwalk was run twice by mistake :facepalm:
-        target_kmh = 0
-        if self.steps <= 2e8:
-            target_kmh = 3  # slowwalk
-        elif self.steps <= 2.7e8:
-            target_kmh = 4.32  # walk
-        elif self.steps <= 3.2e8:
-            target_kmh = 5.32  # fastwalk
-        elif self.steps <= 3.5e8:
-            target_kmh = 3  # revert to slowwalk
-        elif self.steps <= 3.75e8:
-            target_kmh = 4.32  # revert to walk
-        elif self.steps <= 4e8:
-            target_kmh = 5.32  # revert to fastwalk
-        elif self.steps <= 4.5e8:
-            target_kmh = 8  # jog
-        elif self.steps <= 5e8:
-            target_kmh = 10  # run
-        elif self.steps <= 5.2e8:
-            target_kmh = 3  # re-revert to slowwalk
-        elif self.steps <= 5.4e8:
-            target_kmh = 4.32  # re-revert to  walk
-        elif self.steps <= 5.6e8:
-            target_kmh = 5.32  # re-revert to  fastwalk
-        elif self.steps <= 5.8e8:
-            target_kmh = 8  # revert to  jog
-        elif self.steps <= 6e8:
-            target_kmh = 10  # revert to  run
-
-        self.target_y_vel = target_kmh * 1000 / 3600
+        # frame_skip == 10 - from BaseV0 (same actions applied for 10 frames during step)
+        # timestep = 0.001s - from XML
+        # dt = 0.01s (time per step)
+        # max_episode_steps = 1000
+        # so overall time per ep == 10s
+        # if run is 10km/h == 2.778m/s, in 10s would have travelled 28m == 14 - 20 strides. Each stride is maybe 50 steps.
+        # So:
+        # Change max_episode_steps to 10,000 (10x)
+        # Have curriculum be based on 500 steps per target vel.
+        # At each 500 step interval change target vel by some amount
+        # Have a min abs change, and a max abs change.
+        # but otherwise make the delta equally probably between.
+        # always start episode at zero speed.
+        # allow reductions to zero speed.
+        # overall min and max being 0 and fast runner (30min 10k)
+        # Prob should up epoch_steps
+        # need ot investigate how test works - happens after each epoch.
+        # -- ok I think only important thing is the number of test_episodes. Might want to reduce otherwise testing will take ages. but then fewer epochs.
+        # Change of plan - the delta change thing would result in it being very inlikely to get to run speed.
+        # just randonly choose a speed.
+        if (
+            self.curriculum
+            and self.steps % self.curriculum["change_steps"] == 0
+        ):
+            # calc new target
+            self.target_y_vel = self.curriculum["vmin"] + (
+                np.random.random()
+                * (self.curriculum["vmax"] - self.curriculum["vmin"])
+            )
 
         return super().step(*args, **kwargs)
 
@@ -149,7 +156,7 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
         # For sideways movement, use a narrow gaussian to make transverse velocity undesirable
         x_reward = np.exp(-np.square(5 * x_vel))
 
-        if y_vel <= self.target_y_vel:
+        if self.target_y_vel > 0 and y_vel <= self.target_y_vel:
             # For forward velocities less than target, scale gaussian according to target
             # so reward goes from approx 0 at zero velocity to 1 at target
             y_reward = np.exp(
@@ -338,7 +345,7 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
 register_env_with_variants(
     id="myoLegWalk-v0-customReward",
     entry_point="deprl.custom_myosuite:WalkEnvCustomRewardV0",
-    max_episode_steps=1000,
+    max_episode_steps=10000,
     kwargs={
         "model_path": os.path.join(
             os.path.dirname(os.path.abspath(__file__)),
@@ -351,6 +358,7 @@ register_env_with_variants(
         "reset_type": "init",  # none, init, random
         "target_x_vel": 0.0,  # desired x velocity in m/s
         "target_y_vel": 1.2,  # desired y velocity in m/s
+        "curriculum": None,  # whether to use a cuuriculum to determine target_y_vel
         "target_rot": None,  # if None then the initial root pos will be taken, otherwise provide quat
         "weighted_reward_keys": WalkEnvCustomRewardV0.DEFAULT_RWD_KEYS_AND_WEIGHTS,
         "obs_keys": WalkEnvV0.DEFAULT_OBS_KEYS + ["target_vel"],
