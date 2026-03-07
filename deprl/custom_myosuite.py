@@ -33,35 +33,34 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
 
     def step(self, *args, **kwargs):
         self._prev_ctrl = self.sim.data.ctrl.copy()
-        # frame_skip == 10 - from BaseV0 (same actions applied for 10 frames during step)
-        # timestep = 0.001s - from XML
-        # dt = 0.01s (time per step)
-        # max_episode_steps = 1000
-        # so overall time per ep == 10s
-        # if run is 10km/h == 2.778m/s, in 10s would have travelled 28m == 14 - 20 strides. Each stride is maybe 50 steps.
-        # So:
-        # Change max_episode_steps to 10,000 (10x)
-        # Have curriculum be based on 500 steps per target vel.
-        # At each 500 step interval change target vel by some amount
-        # Have a min abs change, and a max abs change.
-        # but otherwise make the delta equally probably between.
-        # always start episode at zero speed.
-        # allow reductions to zero speed.
-        # overall min and max being 0 and fast runner (30min 10k)
-        # Prob should up epoch_steps
-        # need ot investigate how test works - happens after each epoch.
-        # -- ok I think only important thing is the number of test_episodes. Might want to reduce otherwise testing will take ages. but then fewer epochs.
-        # Change of plan - the delta change thing would result in it being very inlikely to get to run speed.
-        # just randonly choose a speed.
-        if (
-            self.curriculum
-            and self.steps % self.curriculum["change_steps"] == 0
-        ):
-            # calc new target
-            self.target_y_vel = self.curriculum["vmin"] + (
-                np.random.random()
-                * (self.curriculum["vmax"] - self.curriculum["vmin"])
-            )
+        if self.curriculum:
+            if self.curriculum["type"] == "random":
+                if self.steps % self.curriculum["change_steps"] == 0:
+                    # calc new target
+                    self.target_y_vel = self.curriculum["vmin"] + (
+                        np.random.random()
+                        * (self.curriculum["vmax"] - self.curriculum["vmin"])
+                    )
+                    print(
+                        f"New target y vel: {self.target_y_vel:.2f} m/s"
+                        f" {self.target_y_vel*3.6:.1f} kph"
+                    )
+            elif self.curriculum["type"] == "accelerate":
+                if self.steps % self.curriculum["change_steps"] == 0:
+                    self.target_y_vel = self.curriculum["vmin"] + (
+                        (self.steps // self.curriculum["change_steps"])
+                        * self.curriculum["inc"]
+                    )
+                    if self.target_y_vel > self.curriculum["vmax"]:
+                        self.target_y_vel = self.curriculum["vmax"]
+                    print(
+                        f"New target y vel: {self.target_y_vel:.2f} m/s"
+                        f" {self.target_y_vel*3.6:.1f} kph"
+                    )
+            else:
+                raise ValueError(
+                    f"Unhandled curriculum type: '{self.curriculum['type']}'"
+                )
 
         return super().step(*args, **kwargs)
 
