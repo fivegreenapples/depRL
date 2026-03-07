@@ -130,7 +130,7 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
         # interesting gait of the legs.
         # So new strategy is to allow a 15 degree swing either way without punishment.
         # cosine(15deg) == 0.966
-        # Shift reward up so =/-15 degrees is above 1
+        # Shift reward up so +/-15 degrees is above 1
         forward_direction_reward = y_component_of_unit_x + (1 - 0.966)
         # Apply high power to punish strongly either side of 15 degrees.
         forward_direction_reward = y_component_of_unit_x**8
