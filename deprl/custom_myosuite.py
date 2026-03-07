@@ -41,10 +41,10 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
                         np.random.random()
                         * (self.curriculum["vmax"] - self.curriculum["vmin"])
                     )
-                    print(
-                        f"New target y vel: {self.target_y_vel:.2f} m/s"
-                        f" {self.target_y_vel*3.6:.1f} kph"
-                    )
+                    # print(
+                    #     f"New target y vel: {self.target_y_vel:.2f} m/s"
+                    #     f" {self.target_y_vel*3.6:.1f} kph"
+                    # )
             elif self.curriculum["type"] == "accelerate":
                 if self.steps % self.curriculum["change_steps"] == 0:
                     self.target_y_vel = self.curriculum["vmin"] + (
@@ -53,10 +53,10 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
                     )
                     if self.target_y_vel > self.curriculum["vmax"]:
                         self.target_y_vel = self.curriculum["vmax"]
-                    print(
-                        f"New target y vel: {self.target_y_vel:.2f} m/s"
-                        f" {self.target_y_vel*3.6:.1f} kph"
-                    )
+                    # print(
+                    #     f"New target y vel: {self.target_y_vel:.2f} m/s"
+                    #     f" {self.target_y_vel*3.6:.1f} kph"
+                    # )
             else:
                 raise ValueError(
                     f"Unhandled curriculum type: '{self.curriculum['type']}'"
