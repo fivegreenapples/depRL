@@ -11,16 +11,16 @@ from myosuite.utils.quat_math import quat2mat
 
 class WalkEnvCustomRewardV0(WalkEnvV0):
     DEFAULT_RWD_KEYS_AND_WEIGHTS = {
-        "gaussian_vel_x": 3,
-        "gaussian_vel_y": 5,
-        "grf": -0.07281,
-        "smooth_exc": -9.7,
-        "number_muscles": -3,
-        "joint_limit": -1,  # -0.1307,
-        "forward_lean": 2,
-        "sideways_lean": 1,
-        "forward_direction": 1,
-        "done": -100,
+        "gaussian_vel_x": 2,
+        "gaussian_vel_y": 4,
+        "grf": -1,
+        "smooth_exc": -100,
+        "number_muscles": -5,
+        "joint_limit": -1.5,
+        "forward_lean": 1,
+        "sideways_lean": 0.5,
+        "forward_direction": 0,
+        "done": -5000,
     }
 
     def _setup(
@@ -170,9 +170,8 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
 
         return x_reward, y_reward
 
-    def _grf(self):
+    def _grf(self, threshold):
         # TODO: calculate and store weight early on. In __init?
-        # TODO: convert the magic 1.2 into a parameter, not least because running would occur higher GRFs
         # TODO: find data on GRFs for walking/running gaits.
         r_grf = (
             self.sim.data.sensor("r_foot").data[0]
@@ -189,16 +188,17 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
         # Either way the values are in Newtons. We normalized this against the weight so the
         # normalized_grf is in units of body weight "BW" (which mirrors how Scone returns contact_load)
         normalized_grf = (r_grf + l_grf) / weight
-        # and then return this value clipped below 1.2 - a magic number from the original paper which
+        # and then return this value clipped below a threshold - a magic number from the original paper which
         # serves to avoid any penalty for grfs which would occur in normal walking.
-        return max(0, normalized_grf - 1.2)
+        return max(0, normalized_grf - threshold)
 
-    def _exc_smooth_cost(self):
+    def _exc_smooth_cost(self, normalized_speed):
         # ctrl is the excitation array
         # act is the resulting activation state
         # actuator_force is the resulting force
         delta_excs = self.sim.data.ctrl - self._prev_ctrl
-        return np.mean(np.square(delta_excs))
+        # see elsewhere for the magic 1.24 number
+        return np.mean(np.square(delta_excs)) / (normalized_speed**1.24)
 
     def _number_muscle_cost(self, threshold):
         return self._get_proportion_active_muscles(threshold)
@@ -264,7 +264,11 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
         # threshold. asumption is faster target velocities require more active muscles.
         # Normalise by walking speed and multiply magic number (from paper) by it.
         target_velocity_normed_by_walking_speed = self.target_y_vel / 1.2
-        muscle_threshold = 0.15 * target_velocity_normed_by_walking_speed
+        # normalized velocity taken to the power of 1.24 gets us to 0.70 activation
+        # threshold at 15kph
+        muscle_threshold = 0.15 * (
+            target_velocity_normed_by_walking_speed**1.24
+        )
 
         # Flag to indicate if walker has fallen vertically. Use to end the simulation.
         # Avoids learning collapse when walker just kneels down.
@@ -278,8 +282,18 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
                 # TODO: name these better
                 ("gaussian_vel_x", vel_x_score),
                 ("gaussian_vel_y", vel_y_score),
-                ("grf", self._grf()),
-                ("smooth_exc", self._exc_smooth_cost()),
+                # this multiplier is pretty generous for running. human grfs should be pretty well below this.
+                # allows penalty to be high here if we want.
+                (
+                    "grf",
+                    self._grf(1.2 * target_velocity_normed_by_walking_speed),
+                ),
+                (
+                    "smooth_exc",
+                    self._exc_smooth_cost(
+                        target_velocity_normed_by_walking_speed
+                    ),
+                ),
                 ("number_muscles", self._number_muscle_cost(muscle_threshold)),
                 ("joint_limit", self._joint_limit_torques()),
                 ("forward_lean", forward_lean),
