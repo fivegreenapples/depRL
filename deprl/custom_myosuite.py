@@ -20,7 +20,7 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
         "forward_lean": 0.5,
         "sideways_lean": 0.5,
         "forward_direction": 0,
-        "done": -5000,
+        "done": -1000,
     }
 
     def _setup(
