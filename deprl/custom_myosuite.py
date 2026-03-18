@@ -14,12 +14,12 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
         "gaussian_vel_x": 2,
         "gaussian_vel_y": 5,
         "grf": -1,
-        "smooth_exc": -25,
-        "number_muscles": -1,
-        "joint_limit": -0.3,
+        "smooth_exc": -12.5,
+        "number_muscles": -0.5,
+        "joint_limit": -0.03,
         "forward_lean": 0.5,
         "sideways_lean": 0.5,
-        "forward_direction": 0,
+        "forward_direction": 0.2,
         "done": -1000,
     }
 
