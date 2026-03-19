@@ -142,7 +142,6 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
         forward_direction_reward = y_component_of_unit_x**5
         # Clip 0 - 1
         forward_direction_reward = max(0, min(1, forward_direction_reward))
-        print("forward_direction_reward", forward_direction_reward)
 
         return (
             forward_lean_reward,
