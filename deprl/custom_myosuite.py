@@ -11,7 +11,7 @@ from myosuite.utils.quat_math import quat2mat
 
 class WalkEnvCustomRewardV0(WalkEnvV0):
     DEFAULT_RWD_KEYS_AND_WEIGHTS = {
-        "gaussian_vel_x": 2,
+        "gaussian_vel_x": 3,
         "gaussian_vel_y": 5,
         "grf": -1,
         "smooth_exc": -12.5,
@@ -19,7 +19,7 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
         "joint_limit": -0.03,
         "forward_lean": 0.5,
         "sideways_lean": 0.5,
-        "forward_direction": 0.2,
+        "forward_direction": 1,
         "done": -1000,
     }
 
@@ -131,11 +131,18 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
         # So new strategy is to allow a 15 degree swing either way without punishment.
         # cosine(15deg) == 0.966
         # Shift reward up so +/-15 degrees is above 1
-        forward_direction_reward = y_component_of_unit_x + (1 - 0.966)
-        # Apply high power to punish strongly either side of 15 degrees.
-        forward_direction_reward = y_component_of_unit_x**8
+
+        # Updated 19 March - changed to +/- 20 deg; cosine(20deg) == 0.939693
+        # Shift reward up so +/-20 degrees is above 1
+
+        forward_direction_reward = y_component_of_unit_x + (1 - 0.939693)
+
+        # Apply high power to punish strongly either side of 20 degrees.
+        # Use odd power to preserve negative values
+        forward_direction_reward = y_component_of_unit_x**5
         # Clip 0 - 1
         forward_direction_reward = max(0, min(1, forward_direction_reward))
+        print("forward_direction_reward", forward_direction_reward)
 
         return (
             forward_lean_reward,
