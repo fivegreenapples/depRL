@@ -19,7 +19,7 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
         "forward_lean": 0.5,
         "sideways_lean": 0.5,
         "forward_direction": 1,
-        "done": -1000,
+        "done": -100,
     }
 
     def _setup(
@@ -75,12 +75,27 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
         else:
             self.y_vel_curriculum = [self.target_y_vel] * self.max_steps
 
+        # Now calculate ideal distance based on vel curriculum
+        # frame_skip == 10 - from BaseV0 (same actions applied for 10 frames during step)
+        # timestep = 0.001s - from XML
+        # dt = 0.01s (time per step)
+        SECONDS_PER_STEP = 0.01
+
+        self.distance_curriculum = [0] * self.max_steps
+        for idx in range(1, len(self.distance_curriculum)):
+            prev_dist = self.distance_curriculum[idx - 1]
+            vel_for_step = self.y_vel_curriculum[idx - 1]
+            self.distance_curriculum[idx] = prev_dist + (
+                vel_for_step * SECONDS_PER_STEP
+            )
+
         super()._setup(**kwargs)
 
     def step(self, *args, **kwargs):
         self._prev_ctrl = self.sim.data.ctrl.copy()
         # _prev_vel = self.target_y_vel
         self.target_y_vel = self.y_vel_curriculum[self.steps]
+        self.target_distance = self.distance_curriculum[self.steps]
 
         # if _prev_vel != self.target_y_vel:
         #     print(
@@ -310,8 +325,12 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
         # Flag to indicate if walker has fallen vertically. Use to end the simulation.
         # Avoids learning collapse when walker just kneels down.
         too_low = self._get_height() < self.min_height
-        # TODO add condition about overally moved distance. e.g. not moved expected
-        # amount in certain time. Basically recognising a velocity collapse.
+
+        # Get y position of sim to assess how far away from ideal distance it is.
+        # Use root body. Negative as sim moves along negative y_axis
+        y_pos = -self.sim.data.qpos[1]
+        delta_y = abs(self.target_distance - y_pos)
+        poor_trajectory = delta_y > 1
 
         rwd_dict = collections.OrderedDict(
             (
@@ -342,6 +361,7 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
                 (
                     "done",
                     too_low
+                    or poor_trajectory
                     or forward_lean == 0
                     or sideways_lean == 0
                     or forward_direction == 0,
