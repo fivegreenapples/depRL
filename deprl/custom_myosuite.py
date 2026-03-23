@@ -11,11 +11,11 @@ from myosuite.utils.quat_math import quat2mat
 class WalkEnvCustomRewardV0(WalkEnvV0):
     DEFAULT_RWD_KEYS_AND_WEIGHTS = {
         "gaussian_vel_x": 3,
-        "gaussian_vel_y": 5,
-        "grf": -1,
+        "gaussian_vel_y": 6,
+        "grf": -0.5,
         "smooth_exc": -12.5,
         "number_muscles": -0.5,
-        "joint_limit": -0.03,
+        "joint_limit": -0.1,
         "forward_lean": 0.5,
         "sideways_lean": 0.5,
         "forward_direction": 1,
