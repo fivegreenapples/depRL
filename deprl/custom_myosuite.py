@@ -22,8 +22,87 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
         "done": -100,
     }
 
+    def _setup(
+        self,
+        curriculum=None,
+        max_steps=None,
+        target_y_vel=1.2,
+        **kwargs,
+    ):
+        self.curriculum = curriculum
+        self.max_steps = max_steps
+        self.target_y_vel = target_y_vel
+
+        self.model_weight = 9.8 * sum(self.sim.model.body_mass)
+        self.num_hinge_joints = np.count_nonzero(
+            self.sim.model.jnt_type == self.sim.lib.mjtJoint.mjJNT_HINGE
+        )
+
+        # Calculate y_vel curriculum ahead of time
+        # Default to incoming target velocity
+        self.y_vel_curriculum = []
+        if self.curriculum:
+            if self.curriculum["type"] == "random":
+                for _ in range(
+                    0, self.max_steps, self.curriculum["change_steps"]
+                ):
+                    new_target = self.curriculum["vmin"] + (
+                        np.random.random()
+                        * (self.curriculum["vmax"] - self.curriculum["vmin"])
+                    )
+                    self.y_vel_curriculum.extend(
+                        [new_target] * self.curriculum["change_steps"]
+                    )
+            elif self.curriculum["type"] == "accelerate":
+                new_target = self.curriculum["vmin"]
+                self.y_vel_curriculum.extend(
+                    [new_target] * self.curriculum["change_steps"]
+                )
+                for _ in range(
+                    self.curriculum["change_steps"],
+                    self.max_steps,
+                    self.curriculum["change_steps"],
+                ):
+                    new_target += self.curriculum["inc"]
+                    new_target = min(new_target, self.curriculum["vmax"])
+                    self.y_vel_curriculum.extend(
+                        [new_target] * self.curriculum["change_steps"]
+                    )
+            else:
+                raise ValueError(
+                    f"Unhandled curriculum type: '{self.curriculum['type']}'"
+                )
+        else:
+            self.y_vel_curriculum = [self.target_y_vel] * self.max_steps
+
+        # Now calculate ideal distance based on vel curriculum
+        # frame_skip == 10 - from BaseV0 (same actions applied for 10 frames during step)
+        # timestep = 0.001s - from XML
+        # dt = 0.01s (time per step)
+        SECONDS_PER_STEP = 0.01
+
+        self.distance_curriculum = [0] * self.max_steps
+        for idx in range(1, len(self.distance_curriculum)):
+            prev_dist = self.distance_curriculum[idx - 1]
+            vel_for_step = self.y_vel_curriculum[idx - 1]
+            self.distance_curriculum[idx] = prev_dist + (
+                vel_for_step * SECONDS_PER_STEP
+            )
+
+        super()._setup(**kwargs)
+
     def step(self, *args, **kwargs):
         self._prev_ctrl = self.sim.data.ctrl.copy()
+        # _prev_vel = self.target_y_vel
+        self.target_y_vel = self.y_vel_curriculum[self.steps]
+        self.target_distance = self.distance_curriculum[self.steps]
+
+        # if _prev_vel != self.target_y_vel:
+        #     print(
+        #         f"New target y vel: {self.target_y_vel:.2f} m/s"
+        #         f" {self.target_y_vel*3.6:.1f} kph"
+        #     )
+
         return super().step(*args, **kwargs)
 
     def _orientation(self):
@@ -144,15 +223,17 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
             self.sim.data.sensor("l_foot").data[0]
             + self.sim.data.sensor("l_toes").data[0]
         )
-        weight = 9.8 * sum(self.sim.model.body_mass)
         # the feet and toe sensors are <touch> sensors which return a single scalar value for
         # surface forces acting through the touch "site" along a normal to the contacting surface.
         # At least I think that's what they do.
         # Either way the values are in Newtons. We normalized this against the weight so the
         # normalized_grf is in units of body weight "BW" (which mirrors how Scone returns contact_load)
-        normalized_grf = (r_grf + l_grf) / weight
+        normalized_grf = (r_grf + l_grf) / self.model_weight
         # and then return this value clipped below 1.2 - a magic number from the original paper which
         # serves to avoid any penalty for grfs which would occur in normal walking.
+        # print(
+        #     f"GRF: {normalized_grf:.3f} {threshold:.3f} {(normalized_grf - threshold):.3f} {max(0, normalized_grf - threshold):.3f}"
+        # )
         return max(0, normalized_grf - 1.2)
 
     def _exc_smooth_cost(self):
@@ -160,6 +241,9 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
         # act is the resulting activation state
         # actuator_force is the resulting force
         delta_excs = self.sim.data.ctrl - self._prev_ctrl
+        # print(
+        #     f"SMOOTH: {(np.mean(np.square(delta_excs)) / (normalized_speed**1.24)):.3f}"
+        # )
         return np.mean(np.square(delta_excs))
 
     def _number_muscle_cost(self, threshold):
@@ -210,11 +294,12 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
         # joints. Which, I think in MuJoCo land means divide by the number of hinge
         # joints as each hinge in MuJoCo only has one axis (in Scone it looks like a
         # single joint incorporates all 3 axes).
-        num_hinge_joints = np.count_nonzero(
-            self.sim.model.jnt_type == self.sim.lib.mjtJoint.mjJNT_HINGE
-        )
+        # Number of hinge joints calculated in _setup()
 
-        return sum_hinge_torques / num_hinge_joints
+        # print(
+        #     f"JOINT_LIMIT: {sum_hinge_torques:.3f} {self.num_hinge_joints:.3f} {(sum_hinge_torques/self.num_hinge_joints):.3f} {-0.03*(sum_hinge_torques/self.num_hinge_joints):.3f}"
+        # )
+        return sum_hinge_torques / self.num_hinge_joints
 
     def get_reward_dict(self, obs_dict):
         vel_reward = self._get_vel_reward()
@@ -265,11 +350,49 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
         )
         return rwd_dict
 
+    # This is a copy from the base class WalkEnvV0 to make it easier to insert the target
+    # velocity observations before the act array. Need act to stay at the end to satisfy
+    # expectations of the custom replay buffer AdaptiveEnergyBuffer.
+    def get_obs_dict(self, sim):
+        obs_dict = {}
+        obs_dict["t"] = np.array([sim.data.time])
+        obs_dict["time"] = np.array([sim.data.time])
+        obs_dict["qpos_without_xy"] = sim.data.qpos[2:].copy()
+        obs_dict["qvel"] = sim.data.qvel[:].copy() * self.dt
+        obs_dict["com_vel"] = np.array([self._get_com_velocity().copy()])
+        obs_dict["torso_angle"] = np.array([self._get_torso_angle().copy()])
+        obs_dict["feet_heights"] = self._get_feet_heights().copy()
+        obs_dict["height"] = np.array([self._get_height()]).copy()
+        obs_dict["feet_rel_positions"] = (
+            self._get_feet_relative_position().copy()
+        )
+        obs_dict["phase_var"] = np.array(
+            [(self.steps / self.hip_period) % 1]
+        ).copy()
+        obs_dict["muscle_length"] = self.muscle_lengths()
+        obs_dict["muscle_velocity"] = self.muscle_velocities()
+        obs_dict["muscle_force"] = self.muscle_forces()
 
+        # Insert target velocity observations here
+        _, y_vel = self._get_com_velocity()
+        obs_dict["target_vel"] = np.array(
+            [
+                self.target_y_vel,
+                self.target_y_vel - y_vel,
+            ]
+        )
+
+        if sim.model.na > 0:
+            obs_dict["act"] = sim.data.act[:].copy()
+
+        return obs_dict
+
+
+MAX_EPISODE_STEPS = 10_000
 register_env_with_variants(
     id="myoLegWalk-v0-customReward",
     entry_point="deprl.custom_myosuite:WalkEnvCustomRewardV0",
-    max_episode_steps=1000,
+    max_episode_steps=MAX_EPISODE_STEPS,
     kwargs={
         "model_path": os.path.join(
             os.path.dirname(os.path.abspath(__file__)),
@@ -282,7 +405,10 @@ register_env_with_variants(
         "reset_type": "init",  # none, init, random
         "target_x_vel": 0.0,  # desired x velocity in m/s
         "target_y_vel": 1.2,  # desired y velocity in m/s
+        "curriculum": None,  # whether to use a cuuriculum to determine target_y_vel
         "target_rot": None,  # if None then the initial root pos will be taken, otherwise provide quat
         "weighted_reward_keys": WalkEnvCustomRewardV0.DEFAULT_RWD_KEYS_AND_WEIGHTS,
+        "obs_keys": WalkEnvV0.DEFAULT_OBS_KEYS + ["target_vel"],
+        "max_steps": MAX_EPISODE_STEPS,
     },
 )
