@@ -280,6 +280,9 @@ def play(
 ):
     """Reloads an agent and an environment from a previous experiment."""
 
+    if str(checkpoints).isnumeric() and int(checkpoints) < 1000000:
+        checkpoints = f"{checkpoints}000000"
+
     logger.log(f"Loading experiment from {path}")
     # Load config file and checkpoint path from folder
     checkpoint_path = os.path.join(path, "checkpoints")
