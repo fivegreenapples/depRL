@@ -167,7 +167,11 @@ class Agent(agents.Agent):
         checkpoint. Works with cuda and non-cuda checkppoints, regardless
         what was saved.
         """
-        state_dict = torch.load(path, map_location=self.device)
+        state_dict = torch.load(
+            path,
+            map_location=self.device,
+            weights_only=True,
+        )
         if "critic.torso.model.0.weight" in state_dict.keys():
             self.model.load_state_dict(state_dict)
         else:

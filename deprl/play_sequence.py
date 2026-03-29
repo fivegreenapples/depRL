@@ -86,7 +86,7 @@ def play_gym(
             global_max_reward = max(global_max_reward, reward)
             length += 1
 
-            if done or length >= environment.max_episode_steps:
+            if done or length >= environment.unwrapped.horizon:
                 episodes += 1
 
                 print()
@@ -280,6 +280,9 @@ def play(
 ):
     """Reloads an agent and an environment from a previous experiment."""
 
+    if str(checkpoints).isnumeric() and int(checkpoints) < 1000000:
+        checkpoints = f"{checkpoints}000000"
+
     logger.log(f"Loading experiment from {path}")
     # Load config file and checkpoint path from folder
     checkpoint_path = os.path.join(path, "checkpoints")
@@ -304,7 +307,7 @@ def play(
 
     # Build the environment.
     environment = eval(environment)
-    environment.seed(seed)
+    environment.unwrapped.seed(seed)
     environment = env_wrappers.apply_wrapper(environment)
     if config and "env_args" in config:
         environment.merge_args(config["env_args"])
