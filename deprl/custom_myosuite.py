@@ -388,7 +388,7 @@ class WalkEnvCustomRewardV0(WalkEnvV0):
         return obs_dict
 
 
-MAX_EPISODE_STEPS = 10_000
+MAX_EPISODE_STEPS = 5_000
 register_env_with_variants(
     id="myoLegWalk-v0-customReward",
     entry_point="deprl.custom_myosuite:WalkEnvCustomRewardV0",
