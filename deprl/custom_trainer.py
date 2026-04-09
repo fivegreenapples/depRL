@@ -105,7 +105,10 @@ class Trainer:
                                 "train/action_cost_coeff",
                                 self.agent.replay.action_cost,
                             )
-                            self.agent.replay.adjust(scores[i])
+                            self.agent.replay.adjust(
+                                scores[i],
+                                scores[i] / lengths[i],
+                            )
                     scores[i] = 0
                     lengths[i] = 0
                     episodes += 1

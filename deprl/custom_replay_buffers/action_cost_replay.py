@@ -25,6 +25,16 @@ class AdaptiveEnergyBuffer(Buffer):
         # type of energy cost function
         self.cost_function = kwargs.pop("cost_function", 3)
 
+        # whether to assess performance on episode score or normalised score (i.e. score per steps)
+        self.threshold_type = kwargs.pop("threshold_type", "episode_score")
+        if self.threshold_type not in [
+            "episode_score",
+            "normalised_episode_score",
+        ]:
+            raise Exception(
+                f"threshold_type of '{self.threshold_type}' is not supported"
+            )
+
         # Initial values ----------------
         self.action_cost = 0.0
         self.cdt_avg = 0
@@ -59,7 +69,12 @@ class AdaptiveEnergyBuffer(Buffer):
             yield self._relabel_batch(batch, rows, columns)
         self.last_steps = steps
 
-    def adjust(self, score):
+    def adjust(self, episode_score, normalised_episode_score):
+        score = (
+            episode_score
+            if self.threshold_type == "episode_score"
+            else normalised_episode_score
+        )
         self.score_avg = self.alpha * self.score_avg + (1 - self.alpha) * score
         if self.score_avg > self.threshold and self.cdt_avg < 0.5:
             self.lr = self.lr * self.lr_decimation
