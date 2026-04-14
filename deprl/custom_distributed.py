@@ -1,4 +1,5 @@
 """Builders for distributed training."""
+
 import multiprocessing
 
 import numpy as np
@@ -224,10 +225,13 @@ class Parallel:
             pipe.send(actions)
 
         for _ in range(self.worker_groups):
-            index, (
-                observations,
-                muscle_states,
-                infos,
+            (
+                index,
+                (
+                    observations,
+                    muscle_states,
+                    infos,
+                ),
             ) = self.output_queue.get()
             self.observations_list[index] = observations
             self.next_observations_list[index] = infos["observations"]

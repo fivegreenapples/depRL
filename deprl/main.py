@@ -1,4 +1,5 @@
 """Script used to train agents."""
+
 import os
 import traceback
 
