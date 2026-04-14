@@ -40,7 +40,10 @@ def check_args(args):
                         <--path>."
         )
 
-    if args["checkpoint"] != "last" and args["checkpoint_file"] is not None:
+    if (
+        args["checkpoint"] not in ["last", "all"]
+        and args["checkpoint_file"] is not None
+    ):
         raise Exception(
             "Do not simultaneously specify a checkpoint step with <--checkpoint> and a checkpoint file with \
                         <--checkpoint_file>."
@@ -70,130 +73,155 @@ def get_paths(path, checkpoint, checkpoint_file):
     return path, checkpoint, checkpoint_path
 
 
-def play_gym(agent, environment, noisy, num_episodes, no_render):
+def play_gym(
+    agent,
+    environment,
+    noisy,
+    num_episodes,
+    no_render,
+    checkpoint_paths,
+):
     """Launches an agent in a Gym-based environment."""
-    observations = environment.reset()
-    muscle_states = environment.muscle_states
+    # Loop over checkpoints, loading the weights as we go.
+    for chkpt_path in checkpoint_paths:
+        agent.load(chkpt_path, only_checkpoint=True)
+        print(f"Loaded checkpoint from {chkpt_path}")
 
-    score = 0
-    length = 0
-    min_reward = float("inf")
-    max_reward = -float("inf")
-    global_min_reward = float("inf")
-    global_max_reward = -float("inf")
-    steps = 0
-    episodes = 0
-
-    while True:
-        if not noisy:
-            actions = agent.test_step(
-                observations, muscle_states=muscle_states, steps=1e6
-            )
-        else:
-            actions = agent.noisy_test_step(
-                observations, muscle_states=muscle_states, steps=1e6
-            )
-        if len(actions.shape) > 1:
-            actions = actions[0, :]
-        observations, reward, done, info = environment.step(actions)
+        observations = environment.reset()
         muscle_states = environment.muscle_states
-        if not no_render:
-            mujoco_render(environment)
 
-        steps += 1
-        score += reward
-        min_reward = min(min_reward, reward)
-        max_reward = max(max_reward, reward)
-        global_min_reward = min(global_min_reward, reward)
-        global_max_reward = max(global_max_reward, reward)
-        length += 1
+        score = 0
+        length = 0
+        min_reward = float("inf")
+        max_reward = -float("inf")
+        global_min_reward = float("inf")
+        global_max_reward = -float("inf")
+        steps = 0
+        episodes = 0
 
-        if done or length >= environment.max_episode_steps:
-            episodes += 1
-
-            print()
-            print(f"Episodes: {episodes:,}")
-            print(f"Score: {score:,.3f}")
-            print(f"Length: {length:,}")
-            print(f"Terminal: {done:}")
-            print(f"Min reward: {min_reward:,.3f}")
-            print(f"Max reward: {max_reward:,.3f}")
-            print(f"Global min reward: {min_reward:,.3f}")
-            print(f"Global max reward: {max_reward:,.3f}")
-            observations = environment.reset()
+        while True:
+            if not noisy:
+                actions = agent.test_step(
+                    observations, muscle_states=muscle_states, steps=1e6
+                )
+            else:
+                actions = agent.noisy_test_step(
+                    observations, muscle_states=muscle_states, steps=1e6
+                )
+            if len(actions.shape) > 1:
+                actions = actions[0, :]
+            observations, reward, done, info = environment.step(actions)
             muscle_states = environment.muscle_states
+            if not no_render:
+                mujoco_render(environment)
 
-            score = 0
-            length = 0
-            min_reward = float("inf")
-            max_reward = -float("inf")
-            if episodes >= num_episodes:
-                break
+            steps += 1
+            score += reward
+            min_reward = min(min_reward, reward)
+            max_reward = max(max_reward, reward)
+            global_min_reward = min(global_min_reward, reward)
+            global_max_reward = max(global_max_reward, reward)
+            length += 1
+
+            if done or length >= environment.max_episode_steps:
+                episodes += 1
+
+                print()
+                print(f"Episodes: {episodes:,}")
+                print(f"Score: {score:,.3f}")
+                print(f"Length: {length:,}")
+                print(f"Terminal: {done:}")
+                print(f"Min reward: {min_reward:,.3f}")
+                print(f"Max reward: {max_reward:,.3f}")
+                print(f"Global min reward: {min_reward:,.3f}")
+                print(f"Global max reward: {max_reward:,.3f}")
+                observations = environment.reset()
+                muscle_states = environment.muscle_states
+
+                score = 0
+                length = 0
+                min_reward = float("inf")
+                max_reward = -float("inf")
+                if episodes >= num_episodes:
+                    break
 
 
 def play_scone(
-    agent, environment, noisy, num_episodes, no_render, checkpoint_path, name
+    agent,
+    environment,
+    noisy,
+    num_episodes,
+    no_render,
+    checkpoint_paths,
+    name,
 ):
     """Launches an agent in a Gym-based environment."""
-    set_scone_save_path(checkpoint_path, environment, name)
+    set_scone_save_path(checkpoint_paths[0], environment, name)
+
     if not no_render:
         environment.store_next_episode()
-    observations = environment.reset()
-    muscle_states = environment.muscle_states
 
-    score = 0
-    length = 0
-    min_reward = float("inf")
-    max_reward = -float("inf")
-    global_min_reward = float("inf")
-    global_max_reward = -float("inf")
-    steps = 0
-    episodes = 0
-    while True:
-        if not noisy:
-            actions = agent.test_step(
-                observations, muscle_states=muscle_states, steps=1e6
-            )
-        else:
-            actions = agent.noisy_test_step(
-                observations, muscle_states=muscle_states, steps=1e6
-            )
-        if len(actions.shape) > 1:
-            actions = actions[0, :]
-        observations, reward, done, info = environment.step(actions)
+    # Loop over checkpoints, loading the weights as we go.
+    for chkpt_path in checkpoint_paths:
+        agent.load(chkpt_path, only_checkpoint=True)
+        print(f"Loaded checkpoint from {chkpt_path}")
+        observations = environment.reset()
         muscle_states = environment.muscle_states
 
-        steps += 1
-        score += reward
-        min_reward = min(min_reward, reward)
-        max_reward = max(max_reward, reward)
-        global_min_reward = min(global_min_reward, reward)
-        global_max_reward = max(global_max_reward, reward)
-        length += 1
-        if done or length >= environment.max_episode_steps:
-            episodes += 1
+        score = 0
+        length = 0
+        min_reward = float("inf")
+        max_reward = -float("inf")
+        global_min_reward = float("inf")
+        global_max_reward = -float("inf")
+        steps = 0
+        episodes = 0
 
-            print()
-            print(f"Episodes: {episodes:,}")
-            print(f"Score: {score:,.3f}")
-            print(f"Length: {length:,}")
-            print(f"Terminal: {done:}")
-            print(f"Min reward: {min_reward:,.3f}")
-            print(f"Max reward: {max_reward:,.3f}")
-            print(f"Global min reward: {min_reward:,.3f}")
-            print(f"Global max reward: {max_reward:,.3f}")
-            if not no_render:
-                environment.write_now()
-                environment.store_next_episode()
-            observations = environment.reset()
+        while True:
+            if not noisy:
+                actions = agent.test_step(
+                    observations, muscle_states=muscle_states, steps=1e6
+                )
+            else:
+                actions = agent.noisy_test_step(
+                    observations, muscle_states=muscle_states, steps=1e6
+                )
+            if len(actions.shape) > 1:
+                actions = actions[0, :]
+            observations, reward, done, info = environment.step(actions)
             muscle_states = environment.muscle_states
 
-            score = 0
-            length = 0
-            min_reward = float("inf")
-            max_reward = -float("inf")
-            if episodes >= num_episodes:
-                break
+            steps += 1
+            score += reward
+            min_reward = min(min_reward, reward)
+            max_reward = max(max_reward, reward)
+            global_min_reward = min(global_min_reward, reward)
+            global_max_reward = max(global_max_reward, reward)
+            length += 1
+            if done or length >= environment.max_episode_steps:
+                episodes += 1
+
+                print()
+                print(f"Episodes: {episodes:,}")
+                print(f"Score: {score:,.3f}")
+                print(f"Length: {length:,}")
+                print(f"Terminal: {done:}")
+                print(f"Min reward: {min_reward:,.3f}")
+                print(f"Max reward: {max_reward:,.3f}")
+                print(f"Global min reward: {min_reward:,.3f}")
+                print(f"Global max reward: {max_reward:,.3f}")
+                if not no_render:
+                    environment.write_now()
+                    environment.store_next_episode()
+                observations = environment.reset()
+                muscle_states = environment.muscle_states
+
+                score = 0
+                length = 0
+                min_reward = float("inf")
+                max_reward = -float("inf")
+                if episodes >= num_episodes:
+                    break
 
 
 def play_control_suite(agent, environment):
@@ -309,6 +337,11 @@ def play(
         path, checkpoint, checkpoint_file
     )
     config, checkpoint_path, _ = load_checkpoint(checkpoint_path, checkpoint)
+    checkpoint_paths = (
+        checkpoint_path if checkpoint_path is list else [checkpoint_path]
+    )
+    # Ensure we have some checkpoints to play
+    assert checkpoint_paths and checkpoint_paths[0]
 
     # Get important info from config
     assert config is not None
@@ -344,14 +377,15 @@ def play(
         seed=seed,
     )
 
-    # Load the weights of the agent from a checkpoint.
-    if checkpoint_path:
-        agent.load(checkpoint_path, only_checkpoint=True)
     if "control" in str(environment).lower():
         if no_render or num_episodes != 5:
             logger.log(
                 "no_render and num_episodes only implemented for gym tasks"
             )
+        if len(checkpoint_paths) > 1:
+            logger.log("no support for multiple checkpoints for control suite")
+        agent.load(checkpoint_paths[0], only_checkpoint=True)
+
         play_control_suite(agent, environment)
     elif "scone" in str(type(environment)).lower():
         play_scone(
@@ -360,11 +394,18 @@ def play(
             noisy,
             num_episodes,
             no_render,
-            checkpoint_path,
+            checkpoint_paths,
             config["tonic"]["name"],
         )
     else:
-        play_gym(agent, environment, noisy, num_episodes, no_render)
+        play_gym(
+            agent,
+            environment,
+            noisy,
+            num_episodes,
+            no_render,
+            checkpoint_paths,
+        )
 
 
 if __name__ == "__main__":
