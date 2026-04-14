@@ -396,7 +396,7 @@ register_env_with_variants(
     kwargs={
         "model_path": os.path.join(
             os.path.dirname(os.path.abspath(__file__)),
-            "../myo_sim/leg/myolegs_basic_scene.xml",
+            "../myo_sim/leg/myolegs_runway.xml",
         ),
         "normalize_act": True,
         "min_height": 0.8,  # minimum center of mass height before reset
