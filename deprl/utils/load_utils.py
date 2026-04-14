@@ -91,6 +91,11 @@ def load_checkpoint(checkpoint_path, checkpoint="last"):
                 for chkpt in checkpoint.split(",")
                 if chkpt.strip() != ""
             ]
+            # Make it easier to specify checkpoints
+            checkpoints = [
+                chkpt if chkpt >= 1_000_000 else chkpt * 1_000_000
+                for chkpt in checkpoints
+            ]
             for checkpoint_id in checkpoints:
                 if checkpoint_id not in checkpoint_ids:
                     logger.error(
@@ -106,6 +111,9 @@ def load_checkpoint(checkpoint_path, checkpoint="last"):
         # Use the specified checkpoint
         else:
             checkpoint_id = int(checkpoint)
+            # Make it easier to specify checkpoints
+            if checkpoint_id < 1_000_000:
+                checkpoint_id *= 1_000_000
             if checkpoint_id in checkpoint_ids:
                 checkpoint_path = os.path.join(
                     checkpoint_path, f"step_{checkpoint_id}"
