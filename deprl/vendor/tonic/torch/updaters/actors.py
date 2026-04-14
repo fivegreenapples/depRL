@@ -526,9 +526,9 @@ class MaximumAPosterioriPolicyOptimization:
             alpha_std=alpha_std.detach(),
         )
         if self.action_penalization:
-            dual_variables[
-                "penalty_temperature"
-            ] = penalty_temperature.detach()
+            dual_variables["penalty_temperature"] = (
+                penalty_temperature.detach()
+            )
 
         return dict(
             policy_mean_loss=policy_mean_loss.detach(),
