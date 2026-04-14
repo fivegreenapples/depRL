@@ -123,7 +123,7 @@ def play_gym(
             global_max_reward = max(global_max_reward, reward)
             length += 1
 
-            if done or length >= environment.max_episode_steps:
+            if done or length >= environment.unwrapped.horizon:
                 episodes += 1
 
                 print()
@@ -361,7 +361,7 @@ def play(
 
     # Build the environment.
     environment = eval(environment)
-    environment.seed(seed)
+    environment.unwrapped.seed(seed)
     environment = env_wrappers.apply_wrapper(environment)
     if config and "env_args" in config:
         environment.merge_args(config["env_args"])
