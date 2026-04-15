@@ -64,7 +64,15 @@ def flip(items, columns):
 
 
 def get_data(
-    paths, baselines, baselines_source, x_axis, y_axis, x_min, x_max, window
+    paths,
+    baselines,
+    baselines_source,
+    x_axis,
+    y_axis,
+    y_axis_norm,
+    x_min,
+    x_max,
+    window,
 ):
     """Gets data from the paths and benchmark."""
 
@@ -131,12 +139,16 @@ def get_data(
             x = df[x_axis].values
             if y_axis in df:
                 mean = df[y_axis].values
+                if y_axis_norm in df:
+                    mean /= df[y_axis_norm].values
                 if y_axis[-5:] == "/mean" and y_axis[:-5] + "/std" in df:
                     std = df[y_axis[:-5] + "/std"].values
                 else:
                     std = None
             elif y_axis + "/mean" in df:
                 mean = df[y_axis + "/mean"].values
+                if y_axis_norm in df:
+                    mean /= df[y_axis_norm].values
                 if y_axis + "/std" in df:
                     std = df[y_axis + "/std"].values
                 else:
@@ -265,6 +277,7 @@ def plot(
     paths,
     x_axis,
     y_axis,
+    y_axis_norm,
     x_label,
     y_label,
     window,
@@ -296,6 +309,7 @@ def plot(
         baselines_source,
         x_axis,
         y_axis,
+        y_axis_norm,
         x_min,
         x_max,
         window,
@@ -485,6 +499,7 @@ def main():
     parser.add_argument("--paths", nargs="+", default=[])
     parser.add_argument("--x_axis", default="train/steps")
     parser.add_argument("--y_axis", default="test/episode_score")
+    parser.add_argument("--y_axis_norm")
     parser.add_argument("--x_label")
     parser.add_argument("--y_label")
     parser.add_argument("--interval", default="bounds")
