@@ -25,6 +25,14 @@ def mujoco_render(env, *args, **kwargs):
         env.unwrapped.sim.renderer.render_to_window(*args, **kwargs)
 
 
+def mujoco_close_renderer(env):
+    if "mujoco_py" in str(type(env.unwrapped.sim)):
+        # no close support
+        pass
+    else:
+        env.unwrapped.sim.renderer.close()
+
+
 @contextmanager
 def stdout_suppression():
     with open(os.devnull, "w") as devnull:

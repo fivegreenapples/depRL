@@ -6,7 +6,7 @@ import time
 
 import numpy as np
 
-from deprl import env_wrappers, mujoco_render
+from deprl import env_wrappers, mujoco_close_renderer, mujoco_render
 from deprl.utils import load_checkpoint
 from deprl.vendor.tonic import logger
 
@@ -413,6 +413,8 @@ def play(
             checkpoint_paths,
             interval,
         )
+        if not no_render:
+            mujoco_close_renderer(environment)
 
 
 if __name__ == "__main__":
