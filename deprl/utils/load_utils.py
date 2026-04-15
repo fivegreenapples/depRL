@@ -130,11 +130,20 @@ def load_checkpoint(checkpoint_path, checkpoint="last"):
         checkpoint_path = None
 
     # Load the experiment configuration.
-    arguments_path = os.path.join(
-        checkpoint_path.split("checkpoints")[0], "config.yaml"
-    )
-    with open(arguments_path, "r") as config_file:
-        config = yaml.load(config_file, Loader=yaml.FullLoader)
+    if checkpoint_path:
+        a_path = (
+            checkpoint_path
+            if not isinstance(checkpoint_path, list)
+            else checkpoint_path[0]
+        )
+        arguments_path = os.path.join(
+            a_path.split("checkpoints")[0], "config.yaml"
+        )
+        with open(arguments_path, "r") as config_file:
+            config = yaml.load(config_file, Loader=yaml.FullLoader)
+    else:
+        config = None
+
     return config, checkpoint_path, time_dict
 
 

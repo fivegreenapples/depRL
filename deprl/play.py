@@ -338,7 +338,9 @@ def play(
     )
     config, checkpoint_path, _ = load_checkpoint(checkpoint_path, checkpoint)
     checkpoint_paths = (
-        checkpoint_path if checkpoint_path is list else [checkpoint_path]
+        checkpoint_path
+        if isinstance(checkpoint_path, list)
+        else [checkpoint_path]
     )
     # Ensure we have some checkpoints to play
     assert checkpoint_paths and checkpoint_paths[0]
