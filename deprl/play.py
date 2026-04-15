@@ -2,6 +2,7 @@
 
 import argparse
 import os
+import time
 
 import numpy as np
 
@@ -80,6 +81,7 @@ def play_gym(
     num_episodes,
     no_render,
     checkpoint_paths,
+    interval,
 ):
     """Launches an agent in a Gym-based environment."""
     # Loop over checkpoints, loading the weights as we go.
@@ -113,6 +115,7 @@ def play_gym(
             observations, reward, done, info = environment.step(actions)
             muscle_states = environment.muscle_states
             if not no_render:
+                time.sleep(interval)
                 mujoco_render(environment)
 
             steps += 1
@@ -328,6 +331,7 @@ def play(
     no_render,
     num_episodes,
     checkpoint_file,
+    interval,
 ):
     """Reloads an agent and an environment from a previous experiment."""
 
@@ -407,6 +411,7 @@ def play(
             num_episodes,
             no_render,
             checkpoint_paths,
+            interval,
         )
 
 
@@ -422,6 +427,7 @@ if __name__ == "__main__":
     parser.add_argument("--agent", default=None)
     parser.add_argument("--checkpoint_file", default=None)
     parser.add_argument("--checkpoint", default="last")
+    parser.add_argument("--interval", type=float, default=0.01)
     parser.add_argument("--environment", "--env")
     args = vars(parser.parse_args())
     check_args(args)
