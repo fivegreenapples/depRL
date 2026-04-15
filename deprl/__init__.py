@@ -5,7 +5,7 @@ from . import (
     custom_trainer,
 )
 from .env_wrappers import apply_wrapper, env_tonic_compat
-from .utils import load, load_baseline, mujoco_render
+from .utils import load, load_baseline, mujoco_close_renderer, mujoco_render
 from .vendor.tonic import (
     Trainer,
     agents,
@@ -33,4 +33,5 @@ __all__ = [
     load,
     load_baseline,
     mujoco_render,
+    mujoco_close_renderer,
 ]

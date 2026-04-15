@@ -67,18 +67,53 @@ def load_checkpoint(checkpoint_path, checkpoint="last"):
         if file[:5] == "step_":
             checkpoint_id = file.split(".")[0]
             checkpoint_ids.append(int(checkpoint_id[5:]))
+    checkpoint_ids.sort()
 
     if checkpoint_ids:
         # Use the last checkpoint.
         if checkpoint == "last":
-            checkpoint_id = max(checkpoint_ids)
+            checkpoint_id = checkpoint_ids[-1]
             checkpoint_path = os.path.join(
                 checkpoint_path, f"step_{checkpoint_id}"
             )
 
-        # Use the specified checkpoint.
+        # Use all checkpoints.
+        elif checkpoint == "all":
+            checkpoint_path = [
+                os.path.join(checkpoint_path, f"step_{checkpoint_id}")
+                for checkpoint_id in checkpoint_ids
+            ]
+
+        # Comma-separated list of checkpoint ids.
+        elif "," in checkpoint:
+            checkpoints = [
+                int(chkpt.strip())
+                for chkpt in checkpoint.split(",")
+                if chkpt.strip() != ""
+            ]
+            # Make it easier to specify checkpoints
+            checkpoints = [
+                chkpt if chkpt >= 1_000_000 else chkpt * 1_000_000
+                for chkpt in checkpoints
+            ]
+            for checkpoint_id in checkpoints:
+                if checkpoint_id not in checkpoint_ids:
+                    logger.error(
+                        f"Checkpoint {checkpoint_id} "
+                        f"not found in {checkpoint_path}"
+                    )
+            checkpoint_path = [
+                os.path.join(checkpoint_path, f"step_{checkpoint_id}")
+                for checkpoint_id in checkpoints
+                if checkpoint_id in checkpoint_ids
+            ]
+
+        # Use the specified checkpoint
         else:
             checkpoint_id = int(checkpoint)
+            # Make it easier to specify checkpoints
+            if checkpoint_id < 1_000_000:
+                checkpoint_id *= 1_000_000
             if checkpoint_id in checkpoint_ids:
                 checkpoint_path = os.path.join(
                     checkpoint_path, f"step_{checkpoint_id}"
@@ -95,11 +130,20 @@ def load_checkpoint(checkpoint_path, checkpoint="last"):
         checkpoint_path = None
 
     # Load the experiment configuration.
-    arguments_path = os.path.join(
-        checkpoint_path.split("checkpoints")[0], "config.yaml"
-    )
-    with open(arguments_path, "r") as config_file:
-        config = yaml.load(config_file, Loader=yaml.FullLoader)
+    if checkpoint_path:
+        a_path = (
+            checkpoint_path
+            if not isinstance(checkpoint_path, list)
+            else checkpoint_path[0]
+        )
+        arguments_path = os.path.join(
+            a_path.split("checkpoints")[0], "config.yaml"
+        )
+        with open(arguments_path, "r") as config_file:
+            config = yaml.load(config_file, Loader=yaml.FullLoader)
+    else:
+        config = None
+
     return config, checkpoint_path, time_dict
 
 
