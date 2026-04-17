@@ -26,7 +26,9 @@ def test_mujoco(env, agent, steps, params=None, test_episodes=10):
             "test/terminated": 0,
         }
         if eval_rwd_metrics:
-            rwd_metrics = {k: [] for k in env.environments[0].rwd_dict.keys()}
+            rwd_metrics = {
+                k: [] for k in env.environments[0].rwd_keys_wt.keys()
+            }
 
         while True:
             # Select an action.
