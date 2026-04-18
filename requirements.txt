@@ -59,4 +59,4 @@ urllib3==2.2.2 ; python_version >= "3.9" and python_full_version <= "3.12.3"
 wandb==0.26.0 ; python_version >= "3.9" and python_full_version <= "3.12.3"
 zipp==3.23.1 ; python_version >= "3.9" and python_version <= "3.12.3"
 
-git+https://github.com/fivegreenapples/myosuite.git@modification-sideways-drift
+git+https://github.com/fivegreenapples/myosuite.git@modification-specific-run-speed
