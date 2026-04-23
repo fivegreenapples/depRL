@@ -47,16 +47,31 @@ def test_mujoco(env, agent, steps, params=None, test_episodes=10):
                 metrics["test/effort"] += np.mean(
                     np.square(env.environments[0].unwrapped.sim.data.act)
                 )
+                metrics["test/effort_pow3"] += np.sum(
+                    np.power(env.environments[0].unwrapped.sim.data.act, 3)
+                )
             metrics["test/terminated"] += int(info["terminations"])
             if eval_rwd_metrics:
                 for k, v in env.environments[0].rwd_keys_wt.items():
                     rwd_metrics[k].append(v * env.environments[0].rwd_dict[k])
+
+            # always record these and without weights
+            for metrc in [
+                "number_muscles15",
+                "number_muscles30",
+                "number_muscles45",
+                "y_vel",
+            ]:
+                metrics[f"test/{metrc}"].append(
+                    env.environments[0].rwd_dict[metrc]
+                )
 
             if info["resets"][0]:
                 break
         # Log the data.Average over episode length here
         metrics["test/terminated"] /= metrics["test/episode_length"]
         metrics["test/effort"] /= metrics["test/episode_length"]
+        metrics["test/effort_pow3"] /= metrics["test/episode_length"]
         if eval_rwd_metrics:
             for k, v in rwd_metrics.items():
                 metrics["test/rwd_metrics/" + k] = np.sum(v)
