@@ -143,7 +143,7 @@ class Trainer:
                     scores[i] = 0
                     lengths[i] = 0
                     episodes += 1
-            if did_reset:
+            if did_reset and self.cur:
                 if self.cur["avg_score"] >= self.cur["threshold"]:
                     self.cur["avg_score"] = 0
 
