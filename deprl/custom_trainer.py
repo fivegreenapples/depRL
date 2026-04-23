@@ -66,6 +66,7 @@ class Trainer:
         lengths = np.zeros(num_workers, int)
         self.steps, epoch_steps = steps, 0
         steps_since_save = 0
+        action_cost_enabled = not self.cur
 
         while True:
             # Select actions.
@@ -139,7 +140,8 @@ class Trainer:
                                 "train/action_cost_coeff",
                                 self.agent.replay.action_cost,
                             )
-                            self.agent.replay.adjust(scores[i])
+                            if action_cost_enabled:
+                                self.agent.replay.adjust(scores[i])
                     scores[i] = 0
                     lengths[i] = 0
                     episodes += 1
@@ -148,10 +150,13 @@ class Trainer:
                     self.cur["avg_score"] = 0
 
                     if self.cur["type"] == "stair":
-                        self.cur["target_v"] = min(
-                            self.cur["v_max"],
-                            self.cur["target_v"] + self.cur["v_inc"],
+                        self.cur["target_v"] = (
+                            self.cur["target_v"] + self.cur["v_inc"]
                         )
+                        if self.cur["target_v"] > self.cur["v_max"]:
+                            # reached max ramp. reset and allow adaptive cost to kick in if configured
+                            self.cur["target_v"] = self.cur["v_min"]
+                            action_cost_enabled = True
                     elif self.cur["type"] == "random":
                         self.cur["target_v"] = self.cur[
                             "v_min"
