@@ -50,7 +50,9 @@ class Trainer:
                 self.cur["target_v"] = self.cur["v_min"]
             elif self.cur["type"] == "sawtooth":
                 self.cur["target_v"] = self.cur["v_min"]
-                self.cur["v_next_reset"] = self.cur["v_inc_reset"]
+                self.cur["v_next_reset"] = (
+                    self.cur["v_min"] + self.cur["v_inc_reset"]
+                )
             elif self.cur["type"] == "random":
                 self.cur["target_v"] = self.cur["v_min"] + np.random.rand() * (
                     self.cur["v_max"] - self.cur["v_min"]
