@@ -94,7 +94,11 @@ class Agent(agents.Agent):
         if self.model.observation_normalizer is not None:
             try:
                 norm_path = self.get_path(path, "obs_norm")
-                load_dict = torch.load(norm_path, map_location=self.device)
+                load_dict = torch.load(
+                    norm_path,
+                    map_location=self.device,
+                    weights_only=False,
+                )
                 for k, v in load_dict.items():
                     setattr(self.model.observation_normalizer, k, v)
             except Exception:
@@ -104,7 +108,11 @@ class Agent(agents.Agent):
         if self.model.return_normalizer is not None:
             try:
                 norm_path = self.get_path(path, "ret_norm")
-                load_dict = torch.load(norm_path, map_location=self.device)
+                load_dict = torch.load(
+                    norm_path,
+                    map_location=self.device,
+                    weights_only=False,
+                )
                 for k, v in load_dict.items():
                     setattr(self.model.return_normalizer, k, v)
             except Exception:
@@ -134,22 +142,38 @@ class Agent(agents.Agent):
             if hasattr(self.actor_updater, "optimizer"):
                 opt_path = self.get_path(path, "actor")
                 self.actor_updater.optimizer.load_state_dict(
-                    torch.load(opt_path, map_location=self.device)
+                    torch.load(
+                        opt_path,
+                        map_location=self.device,
+                        weights_only=False,
+                    )
                 )
             else:
                 opt_path = self.get_path(path, "actor")
                 self.actor_updater.actor_optimizer.load_state_dict(
-                    torch.load(opt_path, map_location=self.device)
+                    torch.load(
+                        opt_path,
+                        map_location=self.device,
+                        weights_only=False,
+                    )
                 )
                 opt_path = self.get_path(path, "dual")
                 self.actor_updater.dual_optimizer.load_state_dict(
-                    torch.load(opt_path, map_location=self.device)
+                    torch.load(
+                        opt_path,
+                        map_location=self.device,
+                        weights_only=False,
+                    )
                 )
 
         if hasattr(self, "critic_updater"):
             opt_path = self.get_path(path, "critic")
             self.critic_updater.optimizer.load_state_dict(
-                torch.load(opt_path, map_location=self.device)
+                torch.load(
+                    opt_path,
+                    map_location=self.device,
+                    weights_only=False,
+                )
             )
 
     def save_buffer(self, path):
@@ -164,10 +188,14 @@ class Agent(agents.Agent):
     def _load_weights(self, path):
         """
         Load weights either for full model or just for actor
-        checkpoint. Works with cuda and non-cuda checkppoints, regardless
+        checkpoint. Works with cuda and non-cuda checkpoints, regardless
         what was saved.
         """
-        state_dict = torch.load(path, map_location=self.device)
+        state_dict = torch.load(
+            path,
+            map_location=self.device,
+            weights_only=False,
+        )
         if "critic.torso.model.0.weight" in state_dict.keys():
             self.model.load_state_dict(state_dict)
         else:
