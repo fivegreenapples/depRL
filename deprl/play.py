@@ -82,15 +82,58 @@ def play_gym(
     no_render,
     checkpoint_paths,
     interval,
+    min_steps_per_episode=None,
 ):
+    log_keys = {
+        "rwd_dict": [
+            "y_vel",
+            "number_muscles15",
+            "number_muscles30",
+            "number_muscles45",
+        ],
+        "obs_dict": [
+            ("feet_heights", "l_foot_height", 0),
+            ("feet_heights", "r_foot_height", 1),
+            ("target_vel", "target_vel", 0),
+        ],
+        "custom": [
+            "l_grf",
+            "r_grf",
+        ],
+        "joint_angle": [
+            "hip_flexion_l",
+            "hip_flexion_r",
+            "knee_angle_l",
+            "knee_angle_r",
+            "ankle_angle_l",
+            "ankle_angle_r",
+        ],
+    }
+    logs = {}
     """Launches an agent in a Gym-based environment."""
     # Loop over checkpoints, loading the weights as we go.
     for chkpt_path in checkpoint_paths:
+        chkpt_logs = {}
+        for k, v in log_keys.items():
+            for vv in v:
+                if isinstance(vv, tuple):
+                    chkpt_logs[f"{k}/{vv[1]}"] = []
+                else:
+                    chkpt_logs[f"{k}/{vv}"] = []
+
         agent.load(chkpt_path, only_checkpoint=True)
         print(f"Loaded checkpoint from {chkpt_path}")
 
         observations = environment.reset()
         muscle_states = environment.muscle_states
+
+        episode_logs = {}
+        for k, v in log_keys.items():
+            for vv in v:
+                if isinstance(vv, tuple):
+                    episode_logs[f"{k}/{vv[1]}"] = []
+                else:
+                    episode_logs[f"{k}/{vv}"] = []
 
         score = 0
         length = 0
@@ -99,7 +142,7 @@ def play_gym(
         global_min_reward = float("inf")
         global_max_reward = -float("inf")
         steps = 0
-        episodes = 0
+        episodes, usable_episodes, unusable_episodes = 0, 0, 0
 
         while True:
             if not noisy:
@@ -113,6 +156,52 @@ def play_gym(
             if len(actions.shape) > 1:
                 actions = actions[0, :]
             observations, reward, done, info = environment.step(actions)
+
+            for k, v in log_keys.items():
+                for vv in v:
+                    if k == "custom":
+                        if vv == "l_grf":
+                            episode_logs[f"{k}/{vv}"].append(
+                                environment.unwrapped.sim.data.sensor(
+                                    "l_foot"
+                                ).data[0]
+                                + environment.unwrapped.sim.data.sensor(
+                                    "l_toes"
+                                ).data[0]
+                            )
+                        elif vv == "r_grf":
+                            episode_logs[f"{k}/{vv}"].append(
+                                environment.unwrapped.sim.data.sensor(
+                                    "r_foot"
+                                ).data[0]
+                                + environment.unwrapped.sim.data.sensor(
+                                    "r_toes"
+                                ).data[0]
+                            )
+                        else:
+                            raise ValueError(
+                                "Unsupported custom metric for logging:", vv
+                            )
+
+                    elif k == "joint_angle":
+                        episode_logs[f"{k}/{vv}"].append(
+                            environment.unwrapped.sim.data.qpos[
+                                environment.unwrapped.sim.model.jnt_qposadr[
+                                    environment.unwrapped.sim.model.joint_name2id(
+                                        vv
+                                    )
+                                ]
+                            ]
+                        )
+
+                    else:
+                        if isinstance(vv, tuple):
+                            episode_logs[f"{k}/{vv[1]}"].append(
+                                info[k][vv[0]][vv[2]]
+                            )
+                        else:
+                            episode_logs[f"{k}/{vv}"].append(info[k][vv])
+
             muscle_states = environment.muscle_states
             if not no_render:
                 time.sleep(interval)
@@ -128,9 +217,22 @@ def play_gym(
 
             if done or length >= environment.unwrapped.horizon:
                 episodes += 1
+                if (
+                    min_steps_per_episode is None
+                    or length >= min_steps_per_episode
+                ):
+                    usable_episodes += 1
+                    unusable_episodes = 0
+                    for k in chkpt_logs:
+                        chkpt_logs[k].append(episode_logs[k])
+                elif min_steps_per_episode is not None:
+                    unusable_episodes += 1
 
                 print()
-                print(f"Episodes: {episodes:,}")
+                if min_steps_per_episode is None:
+                    print(f"Episodes: {episodes:,}")
+                else:
+                    print(f"Episodes: {usable_episodes} (of {episodes:,})")
                 print(f"Score: {score:,.3f}")
                 print(f"Length: {length:,}")
                 print(f"Terminal: {done:}")
@@ -138,15 +240,23 @@ def play_gym(
                 print(f"Max reward: {max_reward:,.3f}")
                 print(f"Global min reward: {min_reward:,.3f}")
                 print(f"Global max reward: {max_reward:,.3f}")
+
                 observations = environment.reset()
                 muscle_states = environment.muscle_states
+                for k in episode_logs:
+                    episode_logs[k] = []
 
                 score = 0
                 length = 0
                 min_reward = float("inf")
                 max_reward = -float("inf")
-                if episodes >= num_episodes:
+                if usable_episodes >= num_episodes:
                     break
+                if unusable_episodes >= 100:
+                    return None
+        logs[chkpt_path] = chkpt_logs
+
+    return logs
 
 
 def play_scone(
@@ -332,6 +442,7 @@ def play(
     num_episodes,
     checkpoint_file,
     interval,
+    record_log,
 ):
     """Reloads an agent and an environment from a previous experiment."""
 
@@ -356,6 +467,14 @@ def play(
     environment = environment or config["tonic"]["test_environment"]
     environment = environment or config["tonic"]["environment"]
 
+    # if "myoLegNaturalAndRobustWalk" in environment:
+    #     para_idx = environment.rfind(")")
+    #     environment = (
+    #         environment[:para_idx]
+    #         + "print_debug=True"
+    #         + environment[para_idx:]
+    #     )
+
     # Run the header first, e.g. to load an ML framework.
     if header:
         exec(header)
@@ -366,6 +485,7 @@ def play(
     agent = eval(agent)
 
     # Build the environment.
+    str_environment = environment.replace("\n", "")
     environment = eval(environment)
     environment.unwrapped.seed(seed)
     environment = env_wrappers.apply_wrapper(environment)
@@ -404,7 +524,7 @@ def play(
             config["tonic"]["name"],
         )
     else:
-        play_gym(
+        logs = play_gym(
             agent,
             environment,
             noisy,
@@ -412,9 +532,41 @@ def play(
             no_render,
             checkpoint_paths,
             interval,
+            1000 if record_log else None,
         )
         if not no_render:
             mujoco_close_renderer(environment)
+
+        if record_log and logs:
+            for chkpt_path, chkpt_logs in logs.items():
+                log_location = os.path.join(
+                    os.path.dirname(os.path.dirname(chkpt_path)),
+                    "play-logs",
+                    record_log,
+                )
+                chkpt = os.path.basename(chkpt_path)
+                chkpt = f"chkpt_{chkpt[5:-6]}"
+
+                os.makedirs(log_location, exist_ok=True)
+                log_file = os.path.join(log_location, f"{chkpt}.csv")
+                env_file = os.path.join(log_location, "environment.txt")
+
+                print(f"Logging into {log_file}")
+                csv_lines = []
+                for log_key, episodes in chkpt_logs.items():
+                    for episode_idx, vals in enumerate(episodes):
+                        csv_line_parts = [log_key, str(episode_idx + 1)] + [
+                            f"{v:.4f}" for v in vals
+                        ]
+                        csv_line = ",".join(csv_line_parts)
+                        csv_lines.append(csv_line)
+                csv = "\n".join(csv_lines)
+                with open(log_file, "w") as f:
+                    f.write(csv)
+                    f.write("\n")
+                with open(env_file, "w") as f:
+                    f.write(str_environment)
+                    f.write("\n")
 
 
 if __name__ == "__main__":
@@ -431,6 +583,7 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoint", default="last")
     parser.add_argument("--interval", type=float, default=0.01)
     parser.add_argument("--environment", "--env")
+    parser.add_argument("--record_log", default=None)
     args = vars(parser.parse_args())
     check_args(args)
     play(**args)
