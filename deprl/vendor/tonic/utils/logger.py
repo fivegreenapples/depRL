@@ -327,7 +327,10 @@ def save(path):
 def load(path, time_dict):
     logger = get_current_logger()
     log_path = create_path(path, "logger")
-    log_dict = torch.load(log_path)
+    log_dict = torch.load(
+        log_path,
+        weights_only=False,
+    )
     for k, v in log_dict.items():
         setattr(logger, k, v)
     filter_csv_by_steps(logger.log_file_path, time_dict["steps"])

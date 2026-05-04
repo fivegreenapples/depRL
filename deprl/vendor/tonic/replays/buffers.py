@@ -149,7 +149,11 @@ class Buffer:
         for i in range(NPARTITIONS):
             partition = int(self.max_size / NPARTITIONS)
             load_path = self.get_path(path, f"buffer_{i * partition}")
-            buffer_load_dict = torch.load(load_path, map_location=device)
+            buffer_load_dict = torch.load(
+                load_path,
+                map_location=device,
+                weights_only=False,
+            )
             if self.buffers is None:
                 self.create_empty_buffer(buffer_load_dict)
             for k, v in buffer_load_dict.items():
@@ -186,7 +190,11 @@ class Buffer:
                         setattr(
                             self,
                             field,
-                            torch.load(buffer_path, map_location=device),
+                            torch.load(
+                                buffer_path,
+                                map_location=device,
+                                weights_only=False,
+                            ),
                         )
                     else:
                         self.load_buffer_incrementally(path, device)

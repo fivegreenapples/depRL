@@ -24,7 +24,13 @@ def test_mujoco(env, agent, steps, params=None, test_episodes=10):
             "test/episode_length": 0,
             "test/effort": 0,
             "test/terminated": 0,
+            "test/effort_pow3": 0,
+            "test/number_muscles15": 0,
+            "test/number_muscles30": 0,
+            "test/number_muscles45": 0,
+            "test/y_vel": 0,
         }
+
         if eval_rwd_metrics:
             rwd_metrics = {
                 k: [] for k in env.environments[0].rwd_keys_wt.keys()
@@ -47,7 +53,18 @@ def test_mujoco(env, agent, steps, params=None, test_episodes=10):
                 metrics["test/effort"] += np.mean(
                     np.square(env.environments[0].unwrapped.sim.data.act)
                 )
+                metrics["test/effort_pow3"] += np.sum(
+                    np.power(env.environments[0].unwrapped.sim.data.act, 3)
+                )
             metrics["test/terminated"] += int(info["terminations"])
+            for metrc in [
+                "number_muscles15",
+                "number_muscles30",
+                "number_muscles45",
+                "y_vel",
+            ]:
+                metrics[f"test/{metrc}"] += env.environments[0].rwd_dict[metrc]
+
             if eval_rwd_metrics:
                 for k, v in env.environments[0].rwd_keys_wt.items():
                     rwd_metrics[k].append(v * env.environments[0].rwd_dict[k])
@@ -55,8 +72,16 @@ def test_mujoco(env, agent, steps, params=None, test_episodes=10):
             if info["resets"][0]:
                 break
         # Log the data.Average over episode length here
-        metrics["test/terminated"] /= metrics["test/episode_length"]
-        metrics["test/effort"] /= metrics["test/episode_length"]
+        for metrc in [
+            "test/terminated",
+            "test/effort",
+            "test/effort_pow3",
+            "test/number_muscles15",
+            "test/number_muscles30",
+            "test/number_muscles45",
+            "test/y_vel",
+        ]:
+            metrics[metrc] /= metrics["test/episode_length"]
         if eval_rwd_metrics:
             for k, v in rwd_metrics.items():
                 metrics["test/rwd_metrics/" + k] = np.sum(v)
